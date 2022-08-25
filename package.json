@@ -19,7 +19,7 @@
     "terrain"
   ],
   "author": "freegis",
-  "license": "ISC",
+  "license": "BSD-3-Clause license",
   "bugs": {
     "url": "https://github.com/FreeGIS/dem2mapboxterrain/issues"
   },
