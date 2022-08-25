@@ -5,7 +5,7 @@
 * 支持encoding为mapbox和terrarium两种格式，使用参考[mapbox raster-dem encoding说明](https://docs.mapbox.com/mapbox-gl-js/style-spec/sources/#raster-dem-encoding)。
 * 支持自定义瓦片级别和瓦片尺寸设置，瓦片周围会有1像素“裙边”，例如指定512，实际输出514*514瓦片，与mapbox官方一致。
 * 自动将输入dem数据源重编码，并重投影至EPSG:3857（web 墨卡托）下生成切片，用户不用管输入数据源，减少操作。
-* 内置了影像金字塔索引和多子进程实现，加速瓦片生成速度。
+* 内置了影像金字塔索引和多进程实现（未使用多线程），从而加速瓦片生成速度。
 * 命令行提供了瓦片生成的进图条提示，便于用户查看生成进度。
 ![切片生成进度条](https://github.com/FreeGIS/dem2mapboxterrain/blob/master/doc/progrebar.png)
 
