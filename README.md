@@ -18,7 +18,9 @@ npm i dem2mapboxterrain -g
 ```
 
 配置：
-由于使用的是gdal，用户需要在本机环境变量定义gdal-data以免运行环境不支持。
+由于使用的是gdal，用户需要[下载gdal-data](https://github.com/FreeGIS/dem2mapboxterrain/blob/master/gdal-data.zip)，以windows为例，解压gdal-data到本地后，在本机环境变量定义gdal-data以免运行环境不支持。
+![配置环境变量](https://github.com/FreeGIS/dem2mapboxterrain/blob/master/doc/gdal-data.png)
+
 
 # 二 使用
 
