@@ -5,6 +5,7 @@
 * 自动将输入dem数据源重编码，并重投影至EPSG:3857（web 墨卡托）下生成切片，用户不用管输入数据源，减少操作。
 * 内置了影像金字塔索引和多子进程实现，加速瓦片生成速度。
 * 命令行提供了瓦片生成的进图条提示，便于用户查看生成进度。
+![切片生成进度条](https://github.com/FreeGIS/dem2mapboxterrain/blob/master/doc/progrebar.png)
 
 # 一 安装
 ```
