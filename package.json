@@ -4,7 +4,7 @@
   "description": "根据dem数据生成地形切片的工具",
   "main": "index.js",
   "bin": {
-    "dem2mt": "./bin/dem2mt.js"
+    "dem2mapboxterrain": "./bin/dem2mapboxterrain.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
