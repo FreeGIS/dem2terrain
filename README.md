@@ -1,11 +1,13 @@
 # dem2mapboxterrain
 根据dem数据生成Mapboxgl可用的地形切片工具，特点如下：
-* 支持encoding为mapbox和terrarium两种格式。
+* 支持encoding为mapbox和terrarium两种格式，使用参考[mapbox raster-dem encoding说明](https://docs.mapbox.com/mapbox-gl-js/style-spec/sources/#raster-dem-encoding)。
 * 支持自定义瓦片级别和瓦片尺寸设置，瓦片周围会有1像素“裙边”，例如指定512，实际输出514*514瓦片，与mapbox官方一致。
 * 自动将输入dem数据源重编码，并重投影至EPSG:3857（web 墨卡托）下生成切片，用户不用管输入数据源，减少操作。
 * 内置了影像金字塔索引和多子进程实现，加速瓦片生成速度。
 * 命令行提供了瓦片生成的进图条提示，便于用户查看生成进度。
 ![切片生成进度条](https://github.com/FreeGIS/dem2mapboxterrain/blob/master/doc/progrebar.png)
+
+注意：该工具统一生成png格式的地形切片，用户通过第三方工具将png转webp时，压缩会导致地形的数据紊乱从而可视化异常。未来应采用gdal webp驱动去支持。
 
 # 一 安装
 ```
@@ -38,3 +40,9 @@ Options:
 * -z:指定生成地形的zoom级别，start-end整型格式。
 * -s:指定tile尺寸，默认是512。
 * -e:指定切片编码规则，默认mapbox，用户可指定terrarium规则输出。
+
+# 三 项目使用
+
+将该工具生成切片文件夹通过web服务器发布，根据[mapboxgl地形examples]简单修改，将在线数据源换成本地web服务器发布的地址即可，注意是否声明raster-dem的encoding格式，这取决于你生成的切片编码，保持一致即可。
+
+![本地离线切片可视化](https://github.com/FreeGIS/dem2mapboxterrain/blob/master/doc/terrain.png)

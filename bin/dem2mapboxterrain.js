@@ -13,11 +13,8 @@ program.option('-z, --zoom <number-number>', '切片级别', '5-15');
 program.option('-s, --size <number>', '切片尺寸（256或512）', '512');
 program.option('-e, --encoding <string>', '地形编码规则（terrarium或mapbox）', 'mapbox');
 
-// 完成
-// 切片尺寸，裙边，encoding，多线程
-
 // todo
-// 金字塔索引、文档
+// 金字塔索引优化
 
 // webp仍然有很多问题，需要解决gdal的webp驱动问题
 
