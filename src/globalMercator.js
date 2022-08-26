@@ -35,11 +35,8 @@ class GlobalMercator {
     MetersToPixels(mx, my, zoom) {
         // Converts EPSG:900913 to pyramid pixel coordinates in given zoom level
         var res = this.Resolution(zoom);
-        console.log(zoom,res);
         var px = (mx + this.originShift) / res;
         var py = (my + this.originShift) / res;
-
-
         return { px: px, py: py };
     }
 

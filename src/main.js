@@ -149,10 +149,10 @@ function main(inputDem, outputTile, options) {
       overviewInfo = {
         startX: dataset.geoTransform[0],
         startY: dataset.geoTransform[3],
-        resX: ds.geoTransform[1],
-        resY: ds.geoTransform[5],
-        width: ds.rasterSize.x,
-        height: ds.rasterSize.y
+        resX: dataset.geoTransform[1],
+        resY: dataset.geoTransform[5],
+        width: dataset.rasterSize.x,
+        height: dataset.rasterSize.y
       }
 
     } else {
