@@ -108,7 +108,8 @@ map.addSource('my-custom-terrain', {
 
 - 扩展 gdal 驱动，使其支持 webp，直接生成 webp 格式的切片
 - 重构核心模块，解耦，扩展使其支持生成 CesiumJS 支持的地形切片格式
-- 生成 mbtiles
+- 重构核心模块解耦数据输出模块，升级支持生成 mbtiles
+- 重构坐标系换算模块，支持生成自定义坐标系的瓦片，例如 `EPSG:4490` 和 `wgs-geodesic` 等
 
 欢迎参与贡献，包括但不限于文档、功能扩展、性能优化！
 
@@ -157,5 +158,18 @@ function terrariumDecode(
   color: [number, number, number]
 ) {
   return (color[0] * 256 + color[1] + color[2] / 256.0) - 32768;
+}
+```
+
+对于 cesium 的地形编码和解码：
+
+```typescript
+// 每个点像素值是 int16
+function cesiumEncode(height: number) {
+  return Math.floor((height + 1000) / 0.2);
+}
+
+function cesiumDecode(pixel: number){
+  return (pixel * 0.2) - 1000;
 }
 ```
