@@ -1,5 +1,5 @@
 # dem2terrain
-根据dem数据生成Mapboxgl可用的地形切片工具，主要用于用户自定义地形数据源和本地离线使用。
+根据dem数据生成地形切片工具，当前仅仅支持Mapboxgl的地形切片格式mapbox和terrarium两种编码格式，主要用于用户自定义地形数据源和本地离线使用。
 
 该工具主要特点如下：
 * 支持encoding为mapbox和terrarium两种格式，使用参考[mapbox raster-dem encoding说明](https://docs.mapbox.com/mapbox-gl-js/style-spec/sources/#raster-dem-encoding)。
