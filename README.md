@@ -51,7 +51,7 @@ Options:
 
 # 三 项目使用
 
-将该工具生成切片文件夹通过web服务器发布，根据[mapboxgl地形examples]简单修改，将在线数据源换成本地web服务器发布的地址即可，注意是否声明raster-dem的encoding格式，这取决于你生成的切片编码，保持一致即可。
+将该工具生成切片文件夹通过web服务器发布，根据[mapboxgl地形examples](https://docs.mapbox.com/mapbox-gl-js/example/add-terrain/)简单修改，将在线数据源换成本地web服务器发布的地址即可，注意是否声明raster-dem的encoding格式，这取决于你生成的切片编码，保持一致即可。
 
 ![本地离线切片可视化](https://github.com/FreeGIS/dem2terrain/blob/master/doc/terrain.png)
 
