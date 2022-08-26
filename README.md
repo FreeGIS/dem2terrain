@@ -60,6 +60,7 @@ Options:
 
 * 扩展node-gdal驱动，使其支持webp，直接生成webp格式的切片。
 * 重构核心模块并解耦，然后扩展使其支持生成cesium的terrier格式地形切片。
+* 升级支持生成mbtiles文件。
 
 
 # 五 知识补充
