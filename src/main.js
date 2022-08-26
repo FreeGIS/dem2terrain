@@ -65,7 +65,6 @@ function main(inputDem, outputTile, options) {
   // 如果不是墨卡托投影，需要预先投影
   if (src_epsg !== 3857) {
     mkt_ds_path = path.join(os.tmpdir(), uuid() + '.tif');
-    //mkt_ds_path = './data/bbb.tif';
     // 地形编码，非普通影像，采用最近邻采样重投影，避免出现尖尖问题
     reprojectImage(encode_ds, mkt_ds_path, 3857, 6);
     dataset = gdal.open(mkt_ds_path, 'r');
@@ -76,8 +75,36 @@ function main(inputDem, outputTile, options) {
     encode_ds.close(mkt_ds_path);
   console.log('地形重投影完成！');
 
-  // stpe3 影像金字塔暂时跳过
-
+  // stpe3 建立影像金字塔 由于地形通常是30m 90m精度
+  let mercator = new GlobalMercator();
+  const ds_res = dataset.geoTransform[1]; // 使用resx替代整个影像的分辨率
+  // 根据ds_res查询出适配的最大的zoom级别
+  let adjustZoom;
+  for (adjustZoom = 1; adjustZoom < 20; adjustZoom++) {
+    let high = mercator.Resolution(adjustZoom);
+    let low = mercator.Resolution(adjustZoom + 1);
+    if (ds_res < high && ds_res >= low) {
+      break;
+    }
+  }
+  let overviewInfos = {};
+  let overviews = [];
+  for (let i = adjustZoom - 1; i >= minZoom; i--) {
+    const factor = Math.pow(2, adjustZoom - i);
+    overviews.push(factor);
+    // zoom级别对应overviews索引
+    overviewInfos[i] = {
+      index: adjustZoom - i - 1,
+      startX: dataset.geoTransform[0],
+      startY: dataset.geoTransform[3],
+      width: Math.ceil(dataset.rasterSize.x * 1.0 / factor),
+      height: Math.ceil(dataset.rasterSize.y * 1.0 / factor),
+      resX: dataset.geoTransform[1] * factor,
+      resY: dataset.geoTransform[5] * factor
+    };
+  }
+  dataset.buildOverviews('NEAREST', overviews);
+  console.log('建立影像金字塔索引完成！');
 
   // step4 切片
   const ominx = dataset.geoTransform[0];
@@ -86,7 +113,7 @@ function main(inputDem, outputTile, options) {
   const ominy = dataset.geoTransform[3] + dataset.rasterSize.y * dataset.geoTransform[5];
 
 
-  let mercator = new GlobalMercator();
+
   // 计算切片总数信息
   let tileCount = 0;
   let levelInfo = {};
@@ -116,14 +143,29 @@ function main(inputDem, outputTile, options) {
   let childPids = new Set();
   for (let tz = minZoom; tz <= maxZoom; tz++) {
     const { tminx, tminy, tmaxx, tmaxy } = levelInfo[tz];
+    let overviewInfo;
+    // 根据z获取宽高和分辨率信息
+    if (tz >= adjustZoom) {
+      overviewInfo = {
+        startX: dataset.geoTransform[0],
+        startY: dataset.geoTransform[3],
+        resX: ds.geoTransform[1],
+        resY: ds.geoTransform[5],
+        width: ds.rasterSize.x,
+        height: ds.rasterSize.y
+      }
+
+    } else {
+      overviewInfo = overviewInfos[tz];
+    }
     for (let i = tminy; i <= tmaxy; i++) {
       for (let j = tminx; j <= tmaxx; j++) {
-        // mapbox地形只认 xyz，不认tms，不用
+        // mapbox地形只认 xyz，不认tms，故直接写死
         let ytile = Math.pow(2, tz) - 1 - i;
         // 由于裙边让周围多了1像素，由于切片是把xyz的地理范围数据编码到512上，所以256这里就是1，512这里就是0.5
         const tileBound = mercator.TileBounds(j, i, tz, offset);
-        const { rb, wb } = geo_query(dataset, tileBound.minx, tileBound.maxy, tileBound.maxx, tileBound.miny, outTileSize);
-        const createInfo = { outTileSize, rb, wb, dsPath: mkt_ds_path, x: j, y: ytile, z: tz, outputTile };
+        const { rb, wb } = geo_query(overviewInfo, tileBound.minx, tileBound.maxy, tileBound.maxx, tileBound.miny, outTileSize);
+        const createInfo = { outTileSize, overviewInfo, rb, wb, dsPath: mkt_ds_path, x: j, y: ytile, z: tz, outputTile };
         workers.createTile(createInfo, function (err, pid) {
           if (err) {
             console.log(err);
@@ -141,12 +183,12 @@ function main(inputDem, outputTile, options) {
               callback: function (err1, closePid) {
                 childPids.delete(closePid);
                 if (childPids.size === 0) {
-                    // 关闭子进程任务
-                    workerFarm.end(workers);
-                    // 删除临时文件
-                    fs.unlinkSync(encode_ds_path);
-                    if (mkt_ds_path !== undefined)
-                      fs.unlinkSync(mkt_ds_path);
+                  // 关闭子进程任务
+                  workerFarm.end(workers);
+                  // 删除临时文件
+                  fs.unlinkSync(encode_ds_path);
+                  if (mkt_ds_path !== undefined)
+                    fs.unlinkSync(mkt_ds_path);
                 }
               },
               args: [],
@@ -163,12 +205,14 @@ function main(inputDem, outputTile, options) {
   }
 }
 
-function geo_query(ds, ulx, uly, lrx, lry, querysize = 0) {
-  const geotran = ds.geoTransform;
-  let rx = Math.floor((ulx - geotran[0]) / geotran[1] + 0.001);
-  let ry = Math.floor((uly - geotran[3]) / geotran[5] + 0.001);
-  let rxsize = Math.max(1, Math.floor((lrx - ulx) / geotran[1] + 0.5));
-  let rysize = Math.max(1, Math.floor((lry - uly) / geotran[5] + 0.5));
+// 重构使其支持影像金字塔查询
+function geo_query(overviewInfo, ulx, uly, lrx, lry, querysize = 0) {
+  const { startX, startY, width, height, resX, resY } = overviewInfo;
+  // 根据金字塔级别，重置分辨率，重置宽高
+  let rx = Math.floor((ulx - startX) / resX + 0.001);
+  let ry = Math.floor((uly - startY) / resY + 0.001);
+  let rxsize = Math.max(1, Math.floor((lrx - ulx) / resX + 0.5));
+  let rysize = Math.max(1, Math.floor((lry - uly) / resY + 0.5));
   let wxsize, wysize;
   if (!querysize) {
     wxsize = rxsize;
@@ -185,9 +229,9 @@ function geo_query(ds, ulx, uly, lrx, lry, querysize = 0) {
     rxsize = rxsize - Math.floor(rxsize * (rxshift * 1.0 / rxsize));
     rx = 0;
   }
-  if ((rx + rxsize) > ds.rasterSize.x) {
-    wxsize = Math.floor(wxsize * (ds.rasterSize.x - rx) * 1.0 / rxsize);
-    rxsize = ds.rasterSize.x - rx;
+  if ((rx + rxsize) > width) {
+    wxsize = Math.floor(wxsize * (width - rx) * 1.0 / rxsize);
+    rxsize = width - rx;
   }
   let wy = 0;
   if (ry < 0) {
@@ -197,9 +241,9 @@ function geo_query(ds, ulx, uly, lrx, lry, querysize = 0) {
     rysize = rysize - Math.floor(rysize * (ryshift * 1.0 / rysize));
     ry = 0;
   }
-  if ((ry + rysize) > ds.rasterSize.y) {
-    wysize = Math.floor(wysize * (ds.rasterSize.y - ry) * 1.0 / rysize);
-    rysize = ds.rasterSize.y - ry;
+  if ((ry + rysize) > height) {
+    wysize = Math.floor(wysize * (height - ry) * 1.0 / rysize);
+    rysize = height - ry;
   }
   return {
     rb: { rx, ry, rxsize, rysize },

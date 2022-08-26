@@ -13,9 +13,6 @@ program.option('-z, --zoom <number-number>', '切片级别', '5-14');
 program.option('-s, --size <number>', '切片尺寸（256或512）', '512');
 program.option('-e, --encoding <string>', '地形编码规则（terrarium或mapbox）', 'mapbox');
 
-// todo
-// 金字塔索引优化
-
 // 解析参数
 program.parse();
 
