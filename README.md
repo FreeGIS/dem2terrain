@@ -59,8 +59,9 @@ Options:
 当前版本足够mapbox使用，但仍然有新功能未开发，留待以后扩展功能，初步拟定待扩展功能如下：
 
 * 扩展node-gdal驱动，使其支持webp，直接生成webp格式的切片。
-* 重构核心模块并解耦，然后扩展使其支持生成cesium的terrier格式地形切片。
-* 升级支持生成mbtiles文件。
+* 重构核心模块解耦数据编码输出模块，扩展使其支持生成cesium的terrier格式地形切片。
+* 重构核心模块解耦数据输出模块，升级支持生成mbtiles文件。
+* 重构坐标系换算模块，支持自定义坐标系的投影切片输出，比如4490和wgs-geodesic切片的输出。
 
 
 # 五 知识补充
@@ -94,5 +95,17 @@ function terrariumEncode(height) {
 
 function terrariumDecode(color) {
     return (color[0] * 256 + color[1] + color[2] / 256.0) - 32768;
+}
+```
+
+cesium 的地形编码和解码：
+```
+// 每个点像素值是int16
+function cesiumEncode(height) {
+  return Math.floor((height+1000)/0.2);
+}
+
+function cesiumDecode(pixel){
+  return (pixel*0.2)-1000;
 }
 ```
