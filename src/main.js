@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const ProgressBar = require('./progressbar/index');
 // 创建一个线程池
-const workerFarm = require('worker-farm');
+const workerFarm = require('./workfarm/index');
 const workers = workerFarm(require.resolve('./createtile'), ['createTile', 'closeDataset']);
 
 function main(inputDem, outputTile, options) {
@@ -136,27 +136,25 @@ function main(inputDem, outputTile, options) {
             // 关闭所有的数据源
             dataset.close();
             //循环关闭子进程的ds，否则临时文件被占用删除不了
-            // 由于workfarm是子进程通信，只能传输字符串不能传输对象，且未提供所有子进程关闭的回调函数
-            // 采用密集调用分发到子进程，由其自己关闭dataset，实现不是很好，合理设计应更改workfarm源码
-            let _count = childPids.size * 4;
-            let ending = false;
-            for (let i = 0; i < _count; i++) {
-              if (ending == true)
-                break;
-              workers.closeDataset(function (err1, closePid) {
-                if (closePid == null)
-                  return;
+            const call = {
+              method: 'closeDataset',
+              callback: function (err1, closePid) {
                 childPids.delete(closePid);
-                if (childPids.size === 0 && ending === false) {
-                  ending = true;
-                  // 关闭子进程任务
-                  workerFarm.end(workers);
-                  // 删除临时文件
-                  fs.unlinkSync(encode_ds_path);
-                  if (mkt_ds_path !== undefined)
-                    fs.unlinkSync(mkt_ds_path);
+                if (childPids.size === 0) {
+                    // 关闭子进程任务
+                    workerFarm.end(workers);
+                    // 删除临时文件
+                    fs.unlinkSync(encode_ds_path);
+                    if (mkt_ds_path !== undefined)
+                      fs.unlinkSync(mkt_ds_path);
                 }
-              });
+              },
+              args: [],
+              retries: 0
+            }
+            // 循环调用，关闭子进程资源
+            for (let childId in workers.farm.children) {
+              workers.farm.send(childId, call);
             }
           }
         })
