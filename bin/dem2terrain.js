@@ -2,21 +2,19 @@
 const program = require('commander');
 const main = require('../src/main');
 program
-  .name('mapbox-terrain-dem')
+  .name('dem2terrain')
   .description('dem文件转mapbox地形切片工具')
-  .argument('<dem file path>', '输入tiff格式的dem文件路径')
-  .argument('<output directory path>', '输出地形切片文件路径')
+  .argument('<input dem file path>', '输入tiff格式的dem文件路径')
+  .argument('<output tile directory path>', '输出地形切片文件路径')
   .version('1.0.0', '-v,--vers', '当前版本号');
 
 // 定义可选条件
-program.option('-z, --zoom <number-number>', '切片级别', '5-15');
+program.option('-z, --zoom <number-number>', '切片级别', '5-14');
 program.option('-s, --size <number>', '切片尺寸（256或512）', '512');
 program.option('-e, --encoding <string>', '地形编码规则（terrarium或mapbox）', 'mapbox');
 
 // todo
 // 金字塔索引优化
-
-// webp仍然有很多问题，需要解决gdal的webp驱动问题
 
 // 解析参数
 program.parse();

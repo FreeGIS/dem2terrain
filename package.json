@@ -1,17 +1,17 @@
 {
-  "name": "dem2mapboxterrain",
+  "name": "dem2terrain",
   "version": "1.0.0",
   "description": "根据dem数据生成地形切片的工具",
   "main": "index.js",
   "bin": {
-    "dem2mapboxterrain": "./bin/dem2mapboxterrain.js"
+    "dem2terrain": "./bin/dem2terrain.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/FreeGIS/dem2mapboxterrain.git"
+    "url": "git+https://github.com/FreeGIS/dem2terrain.git"
   },
   "keywords": [
     "dem",
@@ -21,9 +21,9 @@
   "author": "freegis",
   "license": "BSD-3-Clause license",
   "bugs": {
-    "url": "https://github.com/FreeGIS/dem2mapboxterrain/issues"
+    "url": "https://github.com/FreeGIS/dem2terrain/issues"
   },
-  "homepage": "https://github.com/FreeGIS/dem2mapboxterrain#readme",
+  "homepage": "https://github.com/FreeGIS/dem2terrain#readme",
   "dependencies": {
     "cli-color": "^2.0.3",
     "commander": "^9.4.0",

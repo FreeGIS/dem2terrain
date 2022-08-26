@@ -1,4 +1,4 @@
-# dem2mapboxterrain
+# dem2terrain
 根据dem数据生成Mapboxgl可用的地形切片工具，主要用于用户自定义地形数据源和本地离线使用。
 
 该工具主要特点如下：
@@ -7,27 +7,27 @@
 * 自动将输入dem数据源重编码，并重投影至EPSG:3857（web 墨卡托）下生成切片，用户不用管输入数据源，减少操作。
 * 内置了影像金字塔索引和多进程实现（未使用多线程），从而加速瓦片生成速度。
 * 命令行提供了瓦片生成的进图条提示，便于用户查看生成进度。
-![切片生成进度条](https://github.com/FreeGIS/dem2mapboxterrain/blob/master/doc/progrebar.png)
+![切片生成进度条](https://github.com/FreeGIS/dem2terrain/blob/master/doc/progrebar.png)
 
 注意：该工具统一生成png格式的地形切片，用户通过第三方工具将png转webp时，压缩会导致地形的数据紊乱从而可视化异常。未来应采用gdal webp驱动去支持。
 
 # 一 安装与配置
 安装：
 ```
-npm i dem2mapboxterrain -g
+npm i dem2terrain -g
 ```
 
 配置：
-由于使用的是gdal，用户需要[下载gdal-data](https://github.com/FreeGIS/dem2mapboxterrain/blob/master/gdal-data.zip)，以windows为例，解压gdal-data到本地后，在本机环境变量定义gdal-data以免运行环境不支持。
-![配置环境变量](https://github.com/FreeGIS/dem2mapboxterrain/blob/master/doc/gdal-data.png)
+由于使用的是gdal，用户需要[下载gdal-data](https://github.com/FreeGIS/dem2terrain/blob/master/gdal-data.zip)，以windows为例，解压gdal-data到本地后，在本机环境变量定义gdal-data以免运行环境不支持。
+![配置环境变量](https://github.com/FreeGIS/dem2terrain/blob/master/doc/gdal-data.png)
 
 
 # 二 使用
 
 ```
-dem2mt --help
+dem2terrain --help
 
-Usage: mapbox-terrain-dem [options] <dem file path> <output directory path>
+Usage: dem2terrain [options] <dem file path> <output directory path>
 
 dem文件转mapbox地形切片工具
 
@@ -37,7 +37,7 @@ Arguments:
 
 Options:
   -v,--vers                   当前版本号
-  -z, --zoom <number-number>  切片级别 (default: "5-15")
+  -z, --zoom <number-number>  切片级别 (default: "5-14")
   -s, --size <number>         切片尺寸（256或512） (default: "512")
   -e, --encoding <string>     地形编码规则（terrarium或mapbox） (default: "mapbox")
   -h, --help                  display help for command
@@ -45,7 +45,7 @@ Options:
 
 可选参数说明：
 
-* -z:指定生成地形的zoom级别，start-end整型格式。
+* -z:指定生成地形的zoom级别，start-end整型格式，默认5-14级别，由于地形通常是90m、30m分辨率，切片zoom太大也没什么意义不能提升精度了，而zoom太小，基本也不会显示地形，所以默认生成中间的5-14级别。
 * -s:指定tile尺寸，默认是512。
 * -e:指定切片编码规则，默认mapbox，用户可指定terrarium规则输出。
 
@@ -53,9 +53,16 @@ Options:
 
 将该工具生成切片文件夹通过web服务器发布，根据[mapboxgl地形examples]简单修改，将在线数据源换成本地web服务器发布的地址即可，注意是否声明raster-dem的encoding格式，这取决于你生成的切片编码，保持一致即可。
 
-![本地离线切片可视化](https://github.com/FreeGIS/dem2mapboxterrain/blob/master/doc/terrain.png)
+![本地离线切片可视化](https://github.com/FreeGIS/dem2terrain/blob/master/doc/terrain.png)
 
-# 四 知识补充
+# 四 todo
+当前版本足够mapbox使用，但仍然有新功能未开发，留待以后扩展功能，初步拟定待扩展功能如下：
+
+* 扩展node-gdal驱动，使其支持webp，直接生成webp格式的切片。
+* 重构核心模块并解耦，然后扩展使其支持生成cesium的terrier格式地形切片。
+
+
+# 五 知识补充
 
 mapbox和terrarium都将dem的高度编码成rgb存储，两种差异如下：
 
