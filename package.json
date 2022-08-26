@@ -1,14 +1,17 @@
 {
   "name": "dem2terrain",
-  "version": "1.0.3",
-  "description": "根据dem数据生成地形切片的工具",
+  "version": "1.0.4",
+  "description": "使用 GDAL 制作 DEM 栅格的地形瓦片",
   "main": "index.js",
+  "preferGlobal": true,
+  "engines": {
+    "node": ">= 14"
+  },
+  "type": "module",
   "bin": {
     "dem2terrain": "./bin/dem2terrain.js"
   },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "scripts": {},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/FreeGIS/dem2terrain.git"

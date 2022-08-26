@@ -1,52 +1,81 @@
 /**
  * 进度条实现。
  */
-const log = require('single-line-log').stdout;
-const format = require('./format');
-const clicolor = require('cli-color');
+import { stdout as log } from 'single-line-log';
+import cliColor from 'cli-color';
+import { format } from './format.js';
+
+const { blue, green, yellow, red } = cliColor
+
 /**
- * 封装一个进度条工具。
+ * 进度条
  */
 class ProgressBar {
-    constructor(taskTotal, bar_length = 28, description = 'PROGRESS') {
-        this.length = bar_length;
-        this.taskTotal = taskTotal;
-        this.totalStyle = clicolor.blue.bold(taskTotal);
-        this.descriptionStyle = clicolor.blue.bold(description);
-        //this.completed = 0;
-        //this.tickStep = tickStep;
+  constructor(
+    barLength = 28,
+    description = 'PROGRESS'
+  ) {
+    this.length = barLength;
+    this.taskTotal = 0;
+    this.descriptionStyle = blue.bold(description);
+  
+    //this.completed = 0;
+    //this.tickStep = tickStep;
+  }
+
+  /**
+   * 设置一共有多少个任务
+   * @param {number} value 
+   */
+  setTaskTotal(value) {
+    this.taskTotal = value
+  }
+
+  /**
+   * 在控制台中绘制当前进度条
+   * @param {number} completed 完成了多少个任务
+   */
+  render(completed) {
+    //this.completed++;
+    //const completed = this.completed * this.tickStep;
+    const finishedRate = Number((completed / this.taskTotal).toFixed(4));
+    const finishedCellCount = Math.floor(finishedRate * this.length);
+    let i = 0
+    // 拼接黑色条
+    let cell = '';
+    for (i = 0; i < finishedCellCount; ++i) {
+      cell += '█';
     }
-    render(completed) {
-        //this.completed++;
-        //const completed = this.completed * this.tickStep;
-        const percentage = (completed / this.taskTotal).toFixed(4);
-        const cell_num = Math.floor(percentage * this.length);
-        // 拼接黑色条
-        let cell = '';
-        for (let i = 0; i < cell_num; i++) {
-            cell += '█';
-        }
-        // 拼接灰色条
-        let empty = '';
-        for (let i = 0; i < this.length - cell_num; i++) {
-            empty += '░';
-        }
-
-        const percent = (100 * percentage).toFixed(2);
-        /**
-         * 使用cli-color进行包装美化。
-         */
-
-        const cellStyle = clicolor.green.bgBlack.bold(cell);
-        const completedStyle = clicolor.yellow.bold(completed);
-        const statusStyle = percent == 100.00 ? clicolor.green.bold('任务结束') : clicolor.red.bold('任务执行中');
-
-        // 拼接最终文本
-        const cmdtext = format("<{}:{}%> {}{}  [ {}/{}  {}]", [this.descriptionStyle, percent,
-            cellStyle, empty, completedStyle, this.totalStyle, statusStyle]);
-        log(cmdtext);
+    // 拼接灰色条
+    let empty = '';
+    for (i = 0; i < this.length - finishedCellCount; ++i) {
+      empty += '░';
     }
+
+    const percentStr = (100 * finishedRate).toFixed(2);
+
+    /**
+     * 使用cli-color进行包装美化。
+     */
+    const cellStyle = green.bgBlack.bold(cell);
+    const completedStyle = green.bold(completed);
+    const statusStyle = Number(finishedRate) === 1 ? green.bold('完成') : yellow.bold('转换中⏳')
+
+    // 拼接最终文本
+    const cmdtext = format(
+      ">> 步骤4: {} - {}% {}{} {}/{}",
+      [
+        statusStyle,
+        percentStr,
+        cellStyle,
+        empty,
+        completedStyle,
+        String(this.taskTotal),
+      ]
+    );
+
+    log(cmdtext);
+  }
 }
 
-
-module.exports = ProgressBar;
+export default ProgressBar;
