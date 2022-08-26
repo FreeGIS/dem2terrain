@@ -1,6 +1,6 @@
 {
   "name": "dem2terrain",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "根据dem数据生成地形切片的工具",
   "main": "index.js",
   "bin": {
