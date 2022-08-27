@@ -4,7 +4,7 @@
 
 特点：
 
-- 支持 `mapbox` 和 `terrarium` 两种地形瓦片编码格式；
+- 支持 `mapbox` 和 `terrarium` 两种地形瓦片编码格式供mapboxgl使用，其中terrarium格式是[tangram](https://www.mapzen.com/products/tangram/)引擎的官方地形格式，tangram是另外一款开源的webgl二三维一体化的引擎；
 - 支持自定义瓦片级别和瓦片尺寸设置，瓦片周围会有 1px 的裙边。例如指定生成 512px 的瓦片，实际输出的瓦片文件分辨率为 `514 × 514`，与 Mapbox 官方一致；
 - 自动读取数据源的坐标系统，重编码输入的 DEM 栅格文件，并重投影至 `EPSG:3857`（Web 墨卡托），然后生成瓦片；
 - 内置了影像金字塔索引和多进程实现（暂未使用多线程），加速瓦片生成速度；
