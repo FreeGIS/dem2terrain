@@ -1,173 +1,300 @@
-const pi_div_360 = Math.PI / 360.0;
-const pi_div_180 = Math.PI / 180.0;
-const pi_div_2 = Math.PI / 2.0;
-const pi_4 = Math.PI * 4;
-const pi_2 = Math.PI * 2;
-const pi = Math.PI;
-const _180_div_pi = 180 / Math.PI;
+const PI_OVER_360DEG = Math.PI / 360.0;
+const PI_OVER_180DEG = Math.PI / 180.0;
+const PI_OVER_2 = Math.PI / 2.0;
+const PI_MULT_4 = Math.PI * 4;
+const PI_MULT_2 = Math.PI * 2;
+const PI = Math.PI;
+const DEGREES_PER_RADIAN = 180 / Math.PI;
 
+/*
+  const globalMercator = new GlobalMercator();
+  console.log(globalMercator.TileBounds(224, 117, 8));
+*/
 class GlobalMercator {
-    constructor() {
-        this.tileSize = 256;
-        this.initialResolution = pi_2 * 6378137 / this.tileSize;
-        this.originShift = pi_2 * 6378137 / 2.0;
+  constructor() {
+    this.tileSize = 256;
+    this.initialResolution = PI_MULT_2 * 6378137 / this.tileSize;
+    this.originShift = PI_MULT_2 * 6378137 / 2.0;
+  }
+
+  /**
+   * WGS84 经纬度投影至 3857 投影坐标
+   * @param {number} lon 经度
+   * @param {number} lat 纬度
+   * @returns {{
+   *   x: number;
+   *   y: number;
+   * }}
+   */
+  lonlatToMeters(lon, lat) {
+    let x = lon * this.originShift / 180.0;
+    let y = Math.log(Math.tan((90 + lat) * PI_OVER_360DEG)) / PI_OVER_180DEG;
+
+    y = y * this.originShift / 180.0;
+    return {
+      x,
+      y
+    };
+  }
+
+  /**
+   * 3857 投影坐标投影至 WGS84 经纬度
+   * @param {number} x 经度方向投影坐标 x
+   * @param {number} y 纬度方向投影坐标 x
+   * @returns {{
+   *   lon: number;
+   *   lat: number;
+   * }}
+   */
+  metersToLonlat(x, y) {
+    const lon = x / this.originShift * 180.0;
+    let lat = y / this.originShift * 180.0;
+    lat = DEGREES_PER_RADIAN * (2 * Math.atan(Math.exp(lat * PI_OVER_180DEG)) - PI_OVER_2);
+    return {
+      lon,
+      lat,
+    };
+  }
+
+  /**
+   * 将 3857 坐标转换至对应缩放等级的像素坐标
+   * @param {number} x 
+   * @param {number} y 
+   * @param {number} zoom 
+   * @returns {{
+   *   pixelX: number;
+   *   pixelY: number;
+   * }}
+   */
+  metersToPixels(x, y, zoom) {
+    // Converts EPSG:900913 to pyramid pixel coordinates in given zoom level
+    const res = this.getResolutionForZoom(zoom);
+    const pixelX = (x + this.originShift) / res;
+    const pixelY = (y + this.originShift) / res;
+    return { pixelX, pixelY };
+  }
+
+  getResolutionForZoom(zoom) {
+    // Resolution (meters/pixel) for given zoom level (measured at Equator)
+    return this.initialResolution / Math.pow(2, zoom);
+  }
+
+  /**
+   * 根据 TMS 瓦片行列号计算在 zoom 缩放等级下的四至
+   * @param {number} tileX 瓦片行号
+   * @param {number} tileY 瓦片列号
+   * @param {number} zoom 缩放等级
+   * @param {number} [offset=0] 偏移值 
+   * @returns {{
+   *   xMin: number;
+   *   yMin: number;
+   *   xMax: number;
+   *   yMax: number;
+   * }}
+   */
+  tileBounds(tileX, tileY, zoom, offset = 0) {
+    const xyMin = this.pixelsToMeters(
+      tileX * this.tileSize - offset,
+      tileY * this.tileSize - offset,
+      zoom
+    );
+    const xyMax = this.pixelsToMeters(
+      (tileX + 1) * this.tileSize + offset,
+      (tileY + 1) * this.tileSize + offset,
+      zoom
+    );
+
+    return {
+      xMin: xyMin.x,
+      yMin: xyMin.y,
+      xMax: xyMax.x,
+      yMax: xyMax.y
+    };
+  }
+
+  /**
+   * 计算指定缩放级别下的像素坐标至 3857 投影坐标
+   * @param {number} pixelX 像素坐标X
+   * @param {number} pixelY 像素坐标Y
+   * @param {number} zoom 缩放等级
+   * @returns {{
+   *   x: number;
+   *   y: number;
+   * }}
+   */
+  pixelsToMeters(pixelX, pixelY, zoom) {
+    // Converts pixel coordinates in given zoom level of pyramid to EPSG:900913
+    const res = this.getResolutionForZoom(zoom);
+    const mx = pixelX * res - this.originShift;
+    const my = pixelY * res - this.originShift;
+    //my = this.originShift - py * res;
+    //console.log(my, Math.pow(2, zoom) - 1 - my);
+    //my = Math.pow(2, zoom) - 1 - my;
+
+    return {
+      x: mx,
+      y: my
+    };
+  }
+
+  /**
+   * 像素坐标至瓦片行列号
+   * @param {number} pixelX 像素坐标
+   * @param {number} pixelY 像素坐标
+   * @returns {{
+   *   tileX: number;
+   *   tileY: number;
+   * }}
+   */
+  pixelsToTile(pixelX, pixelY) {
+    const tileX = Math.floor(Math.ceil(pixelX * 1.0 / this.tileSize) - 1);
+    const tileY = Math.floor(Math.ceil(pixelY * 1.0 / this.tileSize) - 1);
+    return {
+      tileX,
+      tileY,
+    };
+  }
+
+  pixelsToRaster(px, py, zoom) {
+    // Move the origin of pixel coordinates to top-left corner
+    const mapSize = this.tileSize << zoom;
+    return {
+      x: px,
+      y: mapSize - py
+    };
+  }
+
+  /**
+   * 
+   * @param {number} lon 
+   * @param {number} lat 
+   * @param {number} zoom 
+   * @returns 
+   */
+  lonlatToTile(lon, lat, zoom) {
+    const {
+      x,
+      y,
+    } = this.lonlatToMeters(lon, lat);
+    const {
+      pixelX,
+      pixelY,
+    } = this.metersToPixels(x, y, zoom);
+    return this.pixelsToTile(pixelX, pixelY);
+  }
+
+  /**
+   * 3857 投影坐标转至对应 zoom 等级的瓦片行列号
+   * @param {number} x 
+   * @param {number} y 
+   * @param {number} zoom 
+   * @returns {{
+   *   tileX: number;
+   *   tileY: number;
+   * }}
+   */
+  metersToTile(x, y, zoom) {
+    const {
+      pixelX,
+      pixelY,
+    } = this.metersToPixels(x, y, zoom);
+    return this.pixelsToTile(pixelX, pixelY);
+  }
+
+  /**
+   * 根据像素大小计算缩放级别
+   * @param {number} pixelSize 像素大小
+   * @returns {number}
+   */
+  zoomForPixelSize(pixelSize) {
+    for (let i = 0; i < 32; i++) {
+      if (pixelSize > this.getResolutionForZoom(i)) {
+        if (i !== -1)
+          return i - 1;
+        else
+          return 0;
+      }
     }
+  }
 
-    LatLonToMeters(lat, lon) {
-        // Converts given lat/lon in WGS84 Datum to XY in Spherical Mercator EPSG:900913
-        let mx = lon * this.originShift / 180.0;
-        let my = Math.log(Math.tan((90 + lat) * pi_div_360)) / pi_div_180;
+  /**
+   * TMS 瓦片行列号转 Google 瓦片行列号
+   * Coordinate origin is moved from bottom-left to top-left corner of the extent
+   * @param {number} tmsTileX 
+   * @param {number} tmsTileY
+   * @param {number} zoom 缩放等级
+   * @returns {{
+   *   tileX: number;
+   *   tileY: number;
+   * }}
+   */
+  googleTile(tmsTileX, tmsTileY, zoom) {
+    return {
+      tileX: tmsTileX,
+      tileY: Math.pow(2, zoom) - 1 - tmsTileY,
+    };
+  }
 
-        my = my * this.originShift / 180.0;
-        return { mx: mx, my: my };
+  /**
+   * Converts TMS tile coordinates to Microsoft QuadTree
+   * 
+   * @param {number} tileX 
+   * @param {number} tileY 
+   * @param {number} zoom 
+   * @returns {string}
+   */
+  quadKey(tileX, tileY, zoom) {
+    let _key = "";
+    tileY = 2 ** zoom - 1 - tileY;
+    for (let i = zoom; i > 0; i--) {
+      let digit = 0;
+      let mask = 1 << (i - 1);
+      if ((tileX & mask) !== 0) {
+        digit += 1;
+      }
+      if ((tileY & mask) !== 0) {
+        digit += 2;
+      }
+      _key += digit.toString();
     }
+    return _key;
+  }
 
-    MetersToLatLon(mx, my) {
-        // Converts XY point from Spherical Mercator EPSG:900913 to lat/lon in WGS84 Datum
-        let lon = mx / this.originShift * 180.0;
-        let lat = my / this.originShift * 180.0;
-        lat =
-            _180_div_pi *
-            (2 * Math.atan(Math.exp(lat * pi_div_180)) - pi_div_2);
-        return { lat: lat, lon: lon };
+  /**
+   * Transform quadkey to tile coordinates
+   * @param {string} quadKey 
+   * @returns {{
+   *   tileX: number;
+   *   tileY: number;
+   *   zoom: number;
+   * }}
+   */
+  quadKeyToTile(quadKey) {
+    let tx = 0;
+    let ty = 0;
+    let zoom = quadKey.length;
+    for (let i = 0; i < zoom; i++) {
+      let bit = zoom - i;
+      let mask = 1 << (bit - 1);
+      if (quadKey[zoom - bit] === "1") {
+        tx |= mask;
+      }
+      if (quadKey[zoom - bit] === "2") {
+        ty |= mask;
+      }
+      if (quadKey[zoom - bit] === "3") {
+        tx |= mask;
+        ty |= mask;
+      }
     }
-
-    MetersToPixels(mx, my, zoom) {
-        // Converts EPSG:900913 to pyramid pixel coordinates in given zoom level
-        var res = this.Resolution(zoom);
-        var px = (mx + this.originShift) / res;
-        var py = (my + this.originShift) / res;
-        return { px: px, py: py };
-    }
-
-    Resolution(zoom) {
-        // Resolution (meters/pixel) for given zoom level (measured at Equator)
-        return this.initialResolution / Math.pow(2, zoom);
-    }
-
-    // tms的计算方向
-    TileBounds(tx, ty, zoom, offset = 0) {
-        // Returns bounds of the given tile in EPSG:900913 coordinates
-        let minx, miny, maxx, maxy;
-        const minxy = this.PixelsToMeters(
-            tx * this.tileSize - offset,
-            ty * this.tileSize - offset,
-            zoom
-        );
-        minx = minxy.mx;
-        miny = minxy.my;
-
-        const maxxy = this.PixelsToMeters(
-            (tx + 1) * this.tileSize + offset,
-            (ty + 1) * this.tileSize + offset,
-            zoom
-        );
-        maxx = maxxy.mx;
-        maxy = maxxy.my;
-
-
-        return { minx: minx, miny: miny, maxx: maxx, maxy: maxy };
-    }
-
-    PixelsToMeters(px, py, zoom) {
-        // Converts pixel coordinates in given zoom level of pyramid to EPSG:900913
-        var res, mx, my;
-        res = this.Resolution(zoom);
-        mx = px * res - this.originShift;
-        my = py * res - this.originShift;
-        //my = this.originShift - py * res;
-        //console.log(my, Math.pow(2, zoom) - 1 - my);
-        //my = Math.pow(2, zoom) - 1 - my;
-
-        return { mx: mx, my: my };
-    }
-
-    PixelsToTile(px, py) {
-        // Returns a tile covering region in given pixel coordinates
-        var tx, ty;
-        tx = Math.floor(Math.ceil(px * 1.0 / this.tileSize) - 1);
-        ty = Math.floor(Math.ceil(py * 1.0 / this.tileSize) - 1);
-        return { tx: tx, ty: ty };
-    }
-
-    PixelsToRaster(px, py, zoom) {
-        // Move the origin of pixel coordinates to top-left corner
-        var mapSize;
-        mapSize = this.tileSize << zoom;
-        return { x: px, y: mapSize - py };
-    }
-
-    LatLonToTile(lat, lon, zoom) {
-        var meters = this.LatLonToMeters(lat, lon);
-        var pixels = this.MetersToPixels(meters.mx, meters.my, zoom);
-        return this.PixelsToTile(pixels.px, pixels.py);
-    }
-
-    MetersToTile(mx, my, zoom) {
-        var pixels = this.MetersToPixels(mx, my, zoom);
-        return this.PixelsToTile(pixels.px, pixels.py);
-    }
-    ZoomForPixelSize(pixelSize) {
-        for (let i = 0; i < 32; i++) {
-            if (pixelSize > this.Resolution(i)) {
-                if (i != -1)
-                    return i - 1;
-                else
-                    return 0;
-            }
-        }
-    }
-    GoogleTile(tx, ty, zoom) {
-        // Converts TMS tile coordinates to Google Tile coordinates
-        // coordinate origin is moved from bottom-left to top-left corner of the extent
-        return { tx: tx, ty: Math.pow(2, zoom) - 1 - ty };
-    }
-
-    QuadKey(tx, ty, zoom) {
-        // Converts TMS tile coordinates to Microsoft QuadTree
-        let quadKey = "";
-        ty = 2 ** zoom - 1 - ty;
-        for (let i = zoom; i > 0; i--) {
-            let digit = 0;
-            let mask = 1 << (i - 1);
-            if ((tx & mask) != 0) {
-                digit += 1;
-            }
-            if ((ty & mask) != 0) {
-                digit += 2;
-            }
-            quadKey += digit.toString();
-        }
-        return quadKey;
-    }
-
-    QuadKeyToTile(quadKey) {
-        // Transform quadkey to tile coordinates
-        let tx = 0;
-        let ty = 0;
-        let zoom = quadKey.length;
-        for (let i = 0; i < zoom; i++) {
-            let bit = zoom - i;
-            let mask = 1 << (bit - 1);
-            if (quadKey[zoom - bit] === "1") {
-                tx |= mask;
-            }
-            if (quadKey[zoom - bit] == "2") {
-                ty |= mask;
-            }
-            if (quadKey[zoom - bit] == "3") {
-                tx |= mask;
-                ty |= mask;
-            }
-        }
-        ty = 2 ** zoom - 1 - ty;
-        return { tx: tx, ty: ty, zoom: zoom };
-    }
+    ty = 2 ** zoom - 1 - ty;
+    return {
+      tileX: tx,
+      tileY: ty,
+      zoom: zoom
+    };
+  }
 }
 
-module.exports = GlobalMercator;
-/*
-const globalMercator = new GlobalMercator();
+export default GlobalMercator;
 
-console.log(globalMercator.TileBounds(224, 117, 8));
-*/
