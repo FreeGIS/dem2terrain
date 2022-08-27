@@ -1,5 +1,4 @@
 const gdal = require('gdal');
-const { createDirs } = require('./util');
 const { getDriverByName } = require('./gdal-util');
 const path = require('path');
 
@@ -36,8 +35,6 @@ function createTile(createInfo, callback) {
     wb.ds = msmDS;
     writeTerrainTile(overviewInfo, rb, wb, [1, 2, 3]);
     const pngPath = path.join(outputTile, '/' + z + '/' + x + '/' + y + '.png');
-    //递归创建文件目录
-    createDirs(pngPath);
     const pngDriver = getDriverByName('png');
     const pngDs = pngDriver.createCopy(pngPath, msmDS);
 

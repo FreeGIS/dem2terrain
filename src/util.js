@@ -13,29 +13,6 @@ const uuid = () => {
   return (s4() + s4() + '-' + s4() + '-' + s4() + '-' + s4() + '-' + s4() + s4() + s4());
 }
 
-/**
- * 根据文件路径，同步递归创建其上一级目录
- * @param {string} file 
- * @returns {boolean}
- */
-const createDirs = (file) => {
-  // 获取文件根目录
-  const dirpath = path.dirname(file);
-  // 有路径直接回调走
-  if (fs.existsSync(dirpath)) {
-    return true;
-  } else {
-    if (createDirs(dirpath)) {
-      try {
-        // 并发时有问题，查询时无，创建时别的子进程已经创建
-        fs.mkdirSync(dirpath);
-      } catch {
-
-      }
-      return true;
-    }
-  }
-};
 
 /**
  * 将毫秒转换为更合适显示的时间数字和单位
@@ -68,5 +45,5 @@ const prettyTime = (timeInMs) => {
 
 
 module.exports = {
-  uuid, createDirs, prettyTime
+  uuid, prettyTime
 }

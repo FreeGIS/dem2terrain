@@ -280,7 +280,9 @@ function main(tifFilePath, outputDir, options) {
   for (let tz = minZoom; tz <= maxZoom; tz++) {
     const { tminx, tminy, tmaxx, tmaxy } = statistics.levelInfo[tz];
     // 生成z级别的目录
-
+    const zPath = path.join(outputDir, tz.toString());
+    if (fs.existsSync(zPath)===false)
+      fs.mkdirSync(zPath);
     /**
      * @type {OverviewInfo}
      */
@@ -299,12 +301,14 @@ function main(tifFilePath, outputDir, options) {
       overviewInfo = statistics.overviewInfos[tz];
     }
     for (let i = tminy; i <= tmaxy; i++) {
+      // mapbox地形只认 xyz，不认tms，故直接写死
+      const ytile = Math.pow(2, tz) - 1 - i;
+      const yPath = path.join(zPath, ytile.toString());
+      if (fs.existsSync(yPath)===false)
+        fs.mkdirSync(yPath);
       for (let j = tminx; j <= tmaxx; j++) {
-        // mapbox地形只认 xyz，不认tms，故直接写死
-        let ytile = Math.pow(2, tz) - 1 - i;
         // 由于裙边让周围多了1像素，由于切片是把xyz的地理范围数据编码到512上，所以256这里就是1，512这里就是0.5
         const tileBound = mercator.tileBounds(j, i, tz, offset);
-
         const { rb, wb } = geoQuery(
           overviewInfo,
           tileBound.xMin,
