@@ -1,16 +1,16 @@
 # 简介
 
-根据 DEM 数据生成地形切片工具。使用 NodeJS + GDAL（NodeBinding）开发制作。当前支持 `raster-dem` 以及 `terrarium` 两种编码格式。可用于用户自定义 DEM 高程数据源生产地形瓦片，以便局域网离线使用。
+根据 DEM 数据生成地形切片工具。使用 NodeJS + GDAL（NodeBinding）开发制作。当前支持 `mapbox` 以及 `terrarium` 两种编码格式。可用于用户自定义 DEM 高程数据源生产地形瓦片，以便局域网离线使用。
 
 特点：
 
-- 支持 `raster-dem`（来自 Mapbox） 和 `terrarium` 两种地形瓦片编码格式
+- 支持 `mapbox` 和 `terrarium` 两种地形瓦片编码格式
 - 支持自定义瓦片级别和瓦片尺寸设置，瓦片周围会有 1px 的裙边。例如指定生成 512px 的瓦片，实际输出的瓦片文件分辨率为 `514 × 514`，与 Mapbox 官方一致；
 - 自动读取数据源的坐标系统，重编码输入的 DEM 栅格文件，并重投影至 `EPSG:3857`（Web 墨卡托），然后生成瓦片；
 - 内置了影像金字塔索引和多进程实现（暂未使用多线程），加速瓦片生成速度；
 - 命令行提供了瓦片生成的进图条提示，便于用户查看生成进度。
 
-![](./doc/progressbar.webp)
+![生成进度条](./doc/progressbar.webp)
 
 > 注意：该工具目前仅生成 png 格式的地形瓦片，用户通过第三方工具将 png 转 webp 时，压缩会导致地形的数据紊乱从而可视化异常。计划用 GDAL webp-driver 改进这一点。
 
@@ -54,7 +54,7 @@ pnpm install && pnpm link --global
 > dem2terrain --help
 Usage: dem2terrain [options] <input-tiff-file> <output-directory>
 
-使用 GDAL 制作地形瓦片，支持 raster-dem(mapboxgl) 和 terrarium 两种编码输出格式，当前仅输出 PNG 容器格式。
+使用 GDAL 制作地形瓦片，支持 mapbox 和 terrarium 两种编码输出格式，当前仅输出 PNG 容器格式。
 
 Arguments:
   input-tiff-file             输入 tif 格式的 DEM 文件路径，支持相对路径
@@ -87,12 +87,18 @@ dem2terrain -z 4-15 -s 256 -e terrarium ./ZONE.tiff ./output
 举例：根据 [MapboxGL 地形示例](https://docs.mapbox.com/mapbox-gl-js/example/add-terrain/) 简单修改，将在线数据源换成本地 Web 服务器发布的地址即可，注意编码格式要与生成时输入的编码格式一致。
 
 ```javascript
-const encoding = 'mapbox-dem'
-const tileSize = 512
-const maxZoom = 14
+// 数据编码，'mapbox'或'terrarium'
+const encoding = 'mapbox';
+const tileSize = 512;
+const maxZoom = 14;
 map.addSource('my-custom-terrain', {
-  type: encoding,
-  url: 'path/to/your/terrain_tiles',
+  type: 'raster-dem',
+  encoding:encoding,
+  // 也可以使用tiles方式
+  //tiles: ['./mapbox/{z}/{x}/{y}.png'],
+  // 注释掉官方的服务url，替换自己的
+   url: 'path/to/your/terrain_tiles',
+	//'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
   tileSize: tileSize,
   maxzoom: maxZoom,
 })
@@ -123,7 +129,7 @@ map.addSource('my-custom-terrain', {
 
 ## 5.2. 编解码差异
 
-`raster-dem` 和 `terrarium` 都将高程值编码成 RGB 数组存储，下面以简单的编解码函数说明两种编码格式的差异。
+`mapbox` 和 `terrarium` 都将高程值编码成 RGB 数组存储，下面以简单的编解码函数说明两种编码格式的差异。
 
 MapboxGL：
 
