@@ -296,5 +296,5 @@ class GlobalMercator {
   }
 }
 
-export default GlobalMercator;
+module.exports = GlobalMercator;
 

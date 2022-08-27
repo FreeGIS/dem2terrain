@@ -1,37 +1,18 @@
-import { tmpdir } from 'os';
-import { unlinkSync } from 'fs';
-import { join } from 'path';
+const gdal = require('gdal');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const { prettyTime, uuid } = require('./util');
+const { reprojectImage } = require('./gdal-util');
+const { mapboxEncode, terrariumEncode } = require('./dem-encode');
+const GlobalMercator = require('./global-mercator');
+const ProgressBar = require('./progressbar/index');
 
-import gdal from 'gdal';
+// 创建一个线程池
+const workerFarm = require('./workfarm/index');
+const workers = workerFarm(require.resolve('./createtile'), ['createTile', 'closeDataset']);
 
-import { prettyTime, uuid } from './util.js';
-import { reprojectImage } from './gdal-util.js';
-import {
-  mapboxEncode,
-  terrariumEncode,
-} from './dem-encode.js';
-// 创建一个进程池
-import initProcessPool, {
-  end,
-} from './process-pool/index.js';
-
-import GlobalMercator from './GlobalMercator.js';
-import ProgressBar from './progressbar/index.js';
-const worker = await import('./createtile.js');
-
-const {
-  open,
-  GDT_Int16
-} = gdal;
-const dataType = GDT_Int16;
-const processPool = initProcessPool(
-  worker,
-  [
-    'createTile',
-    'closeDataset',
-  ]
-);
-const childPids = new Set();
+let childPids = new Set();
 const progressBar = new ProgressBar(60, '进度');
 const mercator = new GlobalMercator();
 
@@ -98,6 +79,7 @@ const encodeDataset = (
   const bandOneHeight = sourceDataset.bands.get(1);
   const heightBuffer = new Int16Array(sourceWidth * sourceHeight);
   // 地形是GDT_Int16 读取所有像素
+  const dataType = gdal.GDT_Int16;
   bandOneHeight.pixels.read(0, 0, sourceWidth, sourceHeight, heightBuffer, {
     buffer_width: sourceWidth,
     buffer_height: sourceHeight,
@@ -106,7 +88,7 @@ const encodeDataset = (
 
   // 创建编码转换的栅格文件
   const sourceDataDriver = sourceDataset.driver;
-  const encodedDatasetPath = join(tmpdir(), `${uuid()}.tif`);
+  const encodedDatasetPath = path.join(os.tmpdir(), `${uuid()}.tif`);
   const encodedDataset = sourceDataDriver.create(
     encodedDatasetPath,
     sourceWidth,
@@ -163,10 +145,10 @@ const project = (encodedDataset) => {
   let dataset;
   if (sourceEPSG !== 3857) {
     // 如果不是墨卡托投影，需要预先投影 
-    webMercatorDatasetPath = join(tmpdir(), `${uuid()}.tif`);
+    webMercatorDatasetPath = path.join(os.tmpdir(), `${uuid()}.tif`);
     // 地形编码，非普通影像，采用最近邻采样重投影，避免出现尖尖问题
     reprojectImage(encodedDataset, webMercatorDatasetPath, 3857, 6);
-    dataset = open(webMercatorDatasetPath, 'r');
+    dataset = gdal.open(webMercatorDatasetPath, 'r');
   } else {
     dataset = encodedDataset;
   }
@@ -224,7 +206,6 @@ const buildPyramid = (
 
   return adjustZoom
 }
-
 /**
  * 
  * @param {string} tifFilePath TIF 文件路径
@@ -236,19 +217,12 @@ const buildPyramid = (
  *   encoding: 'mapbox' | 'terrarium';
  * }} options 可选配置
  */
-export default function main(tifFilePath, outputDir, options) {
+function main(tifFilePath, outputDir, options) {
   // 计时开始
   const startTime = globalThis.performance.now()
-
-  // 解构可选参数
-  const {
-    minZoom,
-    maxZoom,
-    tileSize,
-    encoding,
-  } = options;
-  const sourceDataset = open(tifFilePath, 'r');
-
+  // 结构可选参数
+  const { minZoom, maxZoom, tileSize, encoding } = options;
+  const sourceDataset = gdal.open(tifFilePath, 'r');
   //#region 步骤 1 - 高程值转 RGB，重新编码
   const {
     encodedDataset,
@@ -269,7 +243,6 @@ export default function main(tifFilePath, outputDir, options) {
   const adjustZoom = buildPyramid(dataset, minZoom);
   console.log('>> 步骤3: 构建影像金字塔索引 - 完成');
   //#endregion
-
 
   //#region 步骤4 - 切片
   const ominx = dataset.geoTransform[0];
@@ -294,10 +267,8 @@ export default function main(tifFilePath, outputDir, options) {
       tmaxy
     };
   }
-
   // 设置进度条任务总数
   progressBar.setTaskTotal(statistics.tileCount)
-
   // 实际裙边有1像素 256+1+1 上下左右各1像素
   // 裙边所需的缩放
   let offset = 0
@@ -306,9 +277,10 @@ export default function main(tifFilePath, outputDir, options) {
     offset = 256.0 / tileSize;
     outTileSize = tileSize + 2;
   }
-
   for (let tz = minZoom; tz <= maxZoom; tz++) {
     const { tminx, tminy, tmaxx, tmaxy } = statistics.levelInfo[tz];
+    // 生成z级别的目录
+
     /**
      * @type {OverviewInfo}
      */
@@ -352,16 +324,15 @@ export default function main(tifFilePath, outputDir, options) {
           z: tz,
           outputTile: outputDir
         };
-        processPool.process.options.createTile(createInfo, function (err, pid) {
+        workers.createTile(createInfo, function (err, pid) {
           if (err) {
             console.log(err);
           }
           childPids.add(pid);
           statistics.completeCount++;
-          
+
           // 更新进度条
           progressBar.render(statistics.completeCount);
-
           if (statistics.completeCount === statistics.tileCount) {
             const endTime = globalThis.performance.now()
             const {
@@ -378,19 +349,20 @@ export default function main(tifFilePath, outputDir, options) {
                 childPids.delete(closePid);
                 if (childPids.size === 0) {
                   // 关闭子进程任务
-                  end(processPool);
+                  workerFarm.end(workers);
                   // 删除临时文件
-                  unlinkSync(encodedDatasetPath);
+                  fs.unlinkSync(encodedDatasetPath);
                   if (webMercatorDatasetPath !== undefined)
-                    unlinkSync(webMercatorDatasetPath);
+                    fs.unlinkSync(webMercatorDatasetPath);
+                  resetStats();
                 }
               },
               args: [],
               retries: 0
             }
             // 循环调用，关闭子进程资源
-            for (let childId in processPool.process.children) {
-              processPool.process.send(childId, call);
+            for (let childId in workers.farm.children) {
+              workers.farm.send(childId, call);
             }
           }
         })
@@ -398,8 +370,6 @@ export default function main(tifFilePath, outputDir, options) {
     }
   }
   //#endregion
-
-  resetStats();
 }
 
 const resetStats = () => {
@@ -477,3 +447,5 @@ function geoQuery(overviewInfo, ulx, uly, lrx, lry, querysize = 0) {
     wb: { wx, wy, wxsize, wysize }
   }
 }
+
+module.exports = main;

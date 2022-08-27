@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+const fs = require('fs');
+const path = require('path');
 
 const s4 = () => {
   return (((1 + Math.random()) * 0x10000) | 0).toString(16).substring(1);
@@ -9,7 +9,7 @@ const s4 = () => {
  * 获取随机 uuid
  * @returns {string}
  */
-export const uuid = () => {
+const uuid = () => {
   return (s4() + s4() + '-' + s4() + '-' + s4() + '-' + s4() + '-' + s4() + s4() + s4());
 }
 
@@ -18,17 +18,17 @@ export const uuid = () => {
  * @param {string} file 
  * @returns {boolean}
  */
-export const createDirs = (file) => {
+const createDirs = (file) => {
   // 获取文件根目录
-  const dirpath = dirname(file);
+  const dirpath = path.dirname(file);
   // 有路径直接回调走
-  if (existsSync(dirpath)) {
+  if (fs.existsSync(dirpath)) {
     return true;
   } else {
     if (createDirs(dirpath)) {
       try {
         // 并发时有问题，查询时无，创建时别的子进程已经创建
-        mkdirSync(dirpath);
+        fs.mkdirSync(dirpath);
       } catch {
 
       }
@@ -45,7 +45,7 @@ export const createDirs = (file) => {
  *   unit: 'ms' | 'sec' | 'min' | 'hour';
  * }}
  */
-export const prettyTime = (timeInMs) => {
+const prettyTime = (timeInMs) => {
   let result = 0
   let unit = 'ms'
   if (timeInMs < 1000) {
@@ -64,4 +64,9 @@ export const prettyTime = (timeInMs) => {
     resultTime: result,
     unit
   }
+}
+
+
+module.exports = {
+  uuid, createDirs, prettyTime
 }

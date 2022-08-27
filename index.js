@@ -1,1 +1,4 @@
-export { default as main } from './src/index.js'
+const main = require('./src/index');
+
+module.exports = main;
+
