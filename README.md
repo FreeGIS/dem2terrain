@@ -1,6 +1,6 @@
 # 简介
 
-根据 DEM 数据生成地形切片工具。当前支持 `raster-dem` 以及 `terrarium` 两种编码格式。可用于用户自定义 DEM 高程数据源生产地形瓦片，以便局域网离线使用。
+根据 DEM 数据生成地形切片工具。使用 NodeJS + GDAL（NodeBinding）开发制作。当前支持 `raster-dem` 以及 `terrarium` 两种编码格式。可用于用户自定义 DEM 高程数据源生产地形瓦片，以便局域网离线使用。
 
 特点：
 
