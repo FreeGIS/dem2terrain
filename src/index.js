@@ -4,7 +4,7 @@ const path = require('path');
 const os = require('os');
 const { prettyTime, uuid } = require('./util');
 const { reprojectImage } = require('./gdal-util');
-const { mapboxEncode, terrariumEncode } = require('./dem-encode');
+const { mapboxDem, terrariumDem } = require('./dem-encode');
 const GlobalMercator = require('./global-mercator');
 const ProgressBar = require('./progressbar/index');
 
@@ -104,14 +104,14 @@ const encodeDataset = (
   // 循环高程，转rgb编码
   if (encoding === 'mapbox') {
     heightBuffer.forEach((height, i) => {
-      const color = mapboxEncode(height);
+      const color = mapboxDem.encode(height);
       rChannelBuffer[i] = color[0];
       gChannelBuffer[i] = color[1];
       bChannelBuffer[i] = color[2];
     })
   } else if (encoding === 'terrarium') {
     heightBuffer.forEach((height, i) => {
-      const color = terrariumEncode(height);
+      const color = terrariumDem.encode(height);
       rChannelBuffer[i] = color[0];
       gChannelBuffer[i] = color[1];
       bChannelBuffer[i] = color[2];

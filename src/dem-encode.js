@@ -43,6 +43,43 @@ function terrariumDecode(color) {
     return (color[0] * 256 + color[1] + color[2] / 256.0) - 32768;
 }
 
+
+/**
+ * Cesium 编码
+ * @param {number} height 高程值
+ * @returns {number} 编码值，Int16
+ */
+function cesiumEncode(height) {
+    return Math.floor((height + 1000) / 0.2);
+}
+/**
+* Cesium 解码
+* @param {number} pixel 编码值，Int16
+* @returns {number} 高程值
+*/
+function cesiumDecode(pixel) {
+    return (pixel * 0.2) - 1000;
+}
+
+
+const mapboxDem = {
+    encode: mapboxEncode,
+    tileSchema: 'xyz',
+    tileSize: 512,
+    extension: 'png'
+}
+const terrariumDem = {
+    encode: terrariumEncode,
+    tileSchema: 'xyz',
+    tileSize: 512,
+    extension: 'png'
+}
+const cesiumDem = {
+    encode: cesiumEncode,
+    tileSchema: 'tms',
+    tileSize: 65,
+    extension: 'terrain'
+}
 module.exports = {
-    mapboxEncode, terrariumEncode, mapboxDecode, terrariumDecode
+    mapboxDem, terrariumDem, cesiumDem
 }
