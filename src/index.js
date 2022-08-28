@@ -5,7 +5,8 @@ const os = require('os');
 const { prettyTime, uuid } = require('./util');
 const { reprojectImage } = require('./gdal-util');
 const { mapboxDem, terrariumDem } = require('./dem-encode');
-const GlobalMercator = require('./global-mercator');
+//const GlobalMercator = require('./global-mercator');
+const CoordinateSys = require('./coordinateSys');
 const ProgressBar = require('./progressbar/index');
 
 // 创建一个线程池
@@ -14,8 +15,8 @@ const workers = workerFarm(require.resolve('./createtile'), ['createTile', 'clos
 
 let childPids = new Set();
 const progressBar = new ProgressBar(60, '进度');
-const mercator = new GlobalMercator();
-
+//const mercator = new GlobalMercator();
+const coordinateSys = new CoordinateSys(3857);
 /**
  * @typedef {{
  *   tminx: number;
@@ -177,8 +178,8 @@ const buildPyramid = (
   // 根据ds_res查询出适配的最大的zoom级别
   let adjustZoom = 1;
   for (; adjustZoom < 20; adjustZoom++) {
-    let high = mercator.getResolutionForZoom(adjustZoom);
-    let low = mercator.getResolutionForZoom(adjustZoom + 1);
+    let high = coordinateSys.getResolutionByZoom(adjustZoom);
+    let low = coordinateSys.getResolutionByZoom(adjustZoom + 1);
     if (datasetResolution < high && datasetResolution >= low) {
       break;
     }
@@ -219,7 +220,7 @@ const buildPyramid = (
  */
 function main(tifFilePath, outputDir, options) {
   // 计时开始
-  const startTime = globalThis.performance.now()
+  const startTime = globalThis.performance.now();
   // 结构可选参数
   const { minZoom, maxZoom, tileSize, encoding } = options;
   const sourceDataset = gdal.open(tifFilePath, 'r');
@@ -252,9 +253,8 @@ function main(tifFilePath, outputDir, options) {
 
   // 计算切片总数
   for (let tz = minZoom; tz <= maxZoom; ++tz) {
-    const minTileXY = mercator.metersToTile(ominx, ominy, tz);
-    const maxTileXY = mercator.metersToTile(omaxx, omaxy, tz);
-
+    const minTileXY = coordinateSys.point2Tile(ominx, ominy, tz);
+    const maxTileXY = coordinateSys.point2Tile(omaxx, omaxy, tz);
     const tminx = Math.max(0, minTileXY.tileX);
     const tminy = Math.max(0, minTileXY.tileY);
     const tmaxx = Math.min(Math.pow(2, tz) - 1, maxTileXY.tileX);
@@ -279,10 +279,6 @@ function main(tifFilePath, outputDir, options) {
   }
   for (let tz = minZoom; tz <= maxZoom; tz++) {
     const { tminx, tminy, tmaxx, tmaxy } = statistics.levelInfo[tz];
-    // 生成z级别的目录
-    const zPath = path.join(outputDir, tz.toString());
-    if (fs.existsSync(zPath) === false)
-      fs.mkdirSync(zPath);
     /**
      * @type {OverviewInfo}
      */
@@ -303,12 +299,9 @@ function main(tifFilePath, outputDir, options) {
     for (let i = tminy; i <= tmaxy; i++) {
       // mapbox地形只认 xyz，不认tms，故直接写死
       const ytile = getYtile(i, tz, true);
-      const yPath = path.join(zPath, ytile.toString());
-      if (fs.existsSync(yPath) === false)
-        fs.mkdirSync(yPath);
       for (let j = tminx; j <= tmaxx; j++) {
         // 由于裙边让周围多了1像素，由于切片是把xyz的地理范围数据编码到512上，所以256这里就是1，512这里就是0.5
-        const tileBound = mercator.tileBounds(j, i, tz, offset);
+        const tileBound = coordinateSys.tileBounds(j, i, tz, offset);
         const { rb, wb } = geoQuery(
           overviewInfo,
           tileBound.xMin,

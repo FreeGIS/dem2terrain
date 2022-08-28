@@ -94,10 +94,9 @@ const maxZoom = 14;
 map.addSource('my-custom-terrain', {
   type: 'raster-dem',
   encoding:encoding,
-  // 也可以使用tiles方式
-  //tiles: ['./mapbox/{z}/{x}/{y}.png'],
+  // 使用tiles方式替换本地发布的地形切片服务
+  tiles: ['./mapbox/{z}/{x}/{y}.png'],
   // 注释掉官方的服务url，替换自己的
-   url: 'path/to/your/terrain_tiles',
 	//'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
   tileSize: tileSize,
   maxzoom: maxZoom,

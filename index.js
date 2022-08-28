@@ -1,4 +1,4 @@
-const main = require('./src/index');
+const main = require('./src');
 
 module.exports = main;
 

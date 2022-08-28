@@ -1,7 +1,7 @@
 const gdal = require('gdal');
 const { getDriverByName } = require('./gdal-util');
 const path = require('path');
-
+const { createDirs } = require('./util');
 function writeTerrainTile(overviewInfo, readinfo, writeinfo, bandnums) {
     bandnums.forEach(i => {
         let readband;
@@ -35,9 +35,11 @@ function createTile(createInfo, callback) {
     wb.ds = msmDS;
     writeTerrainTile(overviewInfo, rb, wb, [1, 2, 3]);
     const pngPath = path.join(outputTile, z.toString(), x.toString(), y + '.png');
+    createDirs(pngPath);
     if (pngDriver === null)
         pngDriver = getDriverByName('png');
-    const pngDs = pngDriver.createCopy(pngPath, msmDS);
+    let pngDs = pngDriver.createCopy(pngPath, msmDS);
+
 
     // 释放内存
     msmDS.flush();

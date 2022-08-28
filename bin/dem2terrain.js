@@ -5,7 +5,7 @@ const path = require('path');
 const version = '1.0.4';
 
 program.name('dem2terrain')
-  .description('使用 GDAL 制作地形瓦片，支持 raster-dem(mapboxgl) 和 terrarium 两种编码输出格式，当前仅输出 PNG 容器格式。')
+  .description('使用 GDAL 制作地形瓦片，支持 mapbox 和 terrarium 两种编码输出格式，当前仅输出 PNG 容器格式。')
   .argument('<input-tiff-file>', '输入 tif 格式的 DEM 文件路径，支持相对路径')
   .argument('<output-directory>', '输出目录，支持相对路径')
   .version(version, '-v, --version', '当前版本')
