@@ -22,7 +22,7 @@ function writeTerrainTile(overviewInfo, readinfo, writeinfo, bandnums) {
     })
 }
 
-let dataset = null, memDriver = null;
+let dataset = null, memDriver = null, pngDriver = null;
 function createTile(createInfo, callback) {
     const { outTileSize, overviewInfo, rb, wb, dsPath, x, y, z, outputTile } = createInfo;
     if (dataset === null)
@@ -34,8 +34,9 @@ function createTile(createInfo, callback) {
     rb.ds = dataset;
     wb.ds = msmDS;
     writeTerrainTile(overviewInfo, rb, wb, [1, 2, 3]);
-    const pngPath = path.join(outputTile, '/' + z + '/' + x + '/' + y + '.png');
-    const pngDriver = getDriverByName('png');
+    const pngPath = path.join(outputTile, z.toString(), x.toString(), y + '.png');
+    if (pngDriver === null)
+        pngDriver = getDriverByName('png');
     const pngDs = pngDriver.createCopy(pngPath, msmDS);
 
     // 释放内存

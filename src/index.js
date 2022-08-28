@@ -281,7 +281,7 @@ function main(tifFilePath, outputDir, options) {
     const { tminx, tminy, tmaxx, tmaxy } = statistics.levelInfo[tz];
     // 生成z级别的目录
     const zPath = path.join(outputDir, tz.toString());
-    if (fs.existsSync(zPath)===false)
+    if (fs.existsSync(zPath) === false)
       fs.mkdirSync(zPath);
     /**
      * @type {OverviewInfo}
@@ -302,9 +302,9 @@ function main(tifFilePath, outputDir, options) {
     }
     for (let i = tminy; i <= tmaxy; i++) {
       // mapbox地形只认 xyz，不认tms，故直接写死
-      const ytile = Math.pow(2, tz) - 1 - i;
+      const ytile = getYtile(i, tz, true);
       const yPath = path.join(zPath, ytile.toString());
-      if (fs.existsSync(yPath)===false)
+      if (fs.existsSync(yPath) === false)
         fs.mkdirSync(yPath);
       for (let j = tminx; j <= tmaxx; j++) {
         // 由于裙边让周围多了1像素，由于切片是把xyz的地理范围数据编码到512上，所以256这里就是1，512这里就是0.5
@@ -452,4 +452,16 @@ function geoQuery(overviewInfo, ulx, uly, lrx, lry, querysize = 0) {
   }
 }
 
+/**
+ * 根据tms或xyz策略修正Y的实际值
+ * @param {number} ty 
+ * @param {number} tz 
+ * @param {boolean} tms2xyz 
+ * @returns {number}
+ */
+function getYtile(ty, tz, tms2xyz = true) {
+  if (tms2xyz)
+    return Math.pow(2, tz) - 1 - ty;
+  return ty;
+}
 module.exports = main;
