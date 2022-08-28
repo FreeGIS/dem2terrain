@@ -5,7 +5,6 @@ const os = require('os');
 const { prettyTime, uuid } = require('./util');
 const { reprojectImage } = require('./gdal-util');
 const { mapboxDem, terrariumDem } = require('./dem-encode');
-//const GlobalMercator = require('./global-mercator');
 const CoordinateSys = require('./coordinateSys');
 const ProgressBar = require('./progressbar/index');
 
@@ -15,8 +14,7 @@ const workers = workerFarm(require.resolve('./createtile'), ['createTile', 'clos
 
 let childPids = new Set();
 const progressBar = new ProgressBar(60, '进度');
-//const mercator = new GlobalMercator();
-const coordinateSys = new CoordinateSys(3857);
+let coordinateSys;
 /**
  * @typedef {{
  *   tminx: number;
@@ -135,30 +133,31 @@ const encodeDataset = (
 /**
  * 重投影数据集
  * @param {import('gdal').Dataset} encodedDataset 
+ * @param {number} epsg 
  * @returns {{
  *   dataset: import('gdal').Dataset;
- *   webMercatorDatasetPath: string;
+ *   projectDatasetPath: string;
  * }}
  */
-const project = (encodedDataset) => {
+const project = (encodedDataset, epsg) => {
   let sourceEPSG = encodedDataset.srs.getAuthorityCode();
-  let webMercatorDatasetPath = void 0;
+  let projectDatasetPath = void 0;
   let dataset;
-  if (sourceEPSG !== 3857) {
-    // 如果不是墨卡托投影，需要预先投影 
-    webMercatorDatasetPath = path.join(os.tmpdir(), `${uuid()}.tif`);
+  if (sourceEPSG !== epsg) {
+    // 数据源坐标系与目标坐标系不一致，需要预先投影 
+    projectDatasetPath = path.join(os.tmpdir(), `${uuid()}.tif`);
     // 地形编码，非普通影像，采用最近邻采样重投影，避免出现尖尖问题
-    reprojectImage(encodedDataset, webMercatorDatasetPath, 3857, 6);
-    dataset = gdal.open(webMercatorDatasetPath, 'r');
+    reprojectImage(encodedDataset, projectDatasetPath, epsg, 6);
+    dataset = gdal.open(projectDatasetPath, 'r');
   } else {
     dataset = encodedDataset;
   }
-  // 如果不是3857，encode_ds会重投影，到此该数据集已经失去作用了，直接关闭！
-  if (sourceEPSG !== 3857) {
-    encodedDataset.close(webMercatorDatasetPath);
+  // encode_ds会重投影，到此该数据集已经失去作用了，直接关闭！
+  if (sourceEPSG !== epsg) {
+    encodedDataset.close(projectDatasetPath);
   }
   return {
-    webMercatorDatasetPath,
+    projectDatasetPath,
     dataset
   }
 }
@@ -214,6 +213,7 @@ const buildPyramid = (
  * @param {{
  *   minZoom: number;
  *   maxZoom: number;
+ *   epsg: number;
  *   tileSize: 256 | 512;
  *   encoding: 'mapbox' | 'terrarium';
  * }} options 可选配置
@@ -222,7 +222,8 @@ function main(tifFilePath, outputDir, options) {
   // 计时开始
   const startTime = globalThis.performance.now();
   // 结构可选参数
-  const { minZoom, maxZoom, tileSize, encoding } = options;
+  const { minZoom, maxZoom, epsg, tileSize, encoding } = options;
+  coordinateSys = new CoordinateSys(epsg);
   const sourceDataset = gdal.open(tifFilePath, 'r');
   //#region 步骤 1 - 高程值转 RGB，重新编码
   const {
@@ -235,9 +236,9 @@ function main(tifFilePath, outputDir, options) {
   //#region 步骤 2 - 影像重投影
   const {
     dataset,
-    webMercatorDatasetPath,
-  } = project(encodedDataset)
-  console.log(`>> 步骤2: 重投影至 EPSG:3857 - 完成`);
+    projectDatasetPath,
+  } = project(encodedDataset, epsg)
+  console.log(`>> 步骤2: 重投影至 EPSG:${epsg} - 完成`);
   //#endregion
 
   //#region 步骤 3 - 建立影像金字塔 由于地形通常是30m 90m精度
@@ -257,8 +258,14 @@ function main(tifFilePath, outputDir, options) {
     const maxTileXY = coordinateSys.point2Tile(omaxx, omaxy, tz);
     const tminx = Math.max(0, minTileXY.tileX);
     const tminy = Math.max(0, minTileXY.tileY);
-    const tmaxx = Math.min(Math.pow(2, tz) - 1, maxTileXY.tileX);
-    const tmaxy = Math.min(Math.pow(2, tz) - 1, maxTileXY.tileY);
+    let tmaxx;
+    if(epsg===3857){
+      tmaxx = Math.min(Math.pow(2, tz) - 1, maxTileXY.tileX);
+      tmaxy = Math.min(Math.pow(2, tz) - 1, maxTileXY.tileY);
+    } else {
+      tmaxx = Math.min(Math.pow(2, tz+1) - 1, maxTileXY.tileX);
+      tmaxy = Math.min(Math.pow(2, tz+1) - 1, maxTileXY.tileY);
+    }
     statistics.tileCount += (tmaxy - tminy + 1) * (tmaxx - tminx + 1);
     statistics.levelInfo[tz] = {
       tminx,
@@ -315,7 +322,7 @@ function main(tifFilePath, outputDir, options) {
           overviewInfo,
           rb,
           wb,
-          dsPath: webMercatorDatasetPath,
+          dsPath: projectDatasetPath,
           x: j,
           y: ytile,
           z: tz,
@@ -349,8 +356,8 @@ function main(tifFilePath, outputDir, options) {
                   workerFarm.end(workers);
                   // 删除临时文件
                   fs.unlinkSync(encodedDatasetPath);
-                  if (webMercatorDatasetPath !== undefined)
-                    fs.unlinkSync(webMercatorDatasetPath);
+                  if (projectDatasetPath !== undefined)
+                    fs.unlinkSync(projectDatasetPath);
                   resetStats();
                 }
               },
