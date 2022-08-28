@@ -2,7 +2,7 @@ const gdal = require('gdal');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { prettyTime, uuid } = require('./util');
+const { prettyTime, uuid, mkdirsSync } = require('./util');
 const { reprojectImage } = require('./gdal-util');
 const { mapboxDem, terrariumDem } = require('./dem-encode');
 const CoordinateSys = require('./coordinateSys');
@@ -259,12 +259,12 @@ function main(tifFilePath, outputDir, options) {
     const tminx = Math.max(0, minTileXY.tileX);
     const tminy = Math.max(0, minTileXY.tileY);
     let tmaxx;
-    if(epsg===3857){
+    if (epsg === 3857) {
       tmaxx = Math.min(Math.pow(2, tz) - 1, maxTileXY.tileX);
       tmaxy = Math.min(Math.pow(2, tz) - 1, maxTileXY.tileY);
     } else {
-      tmaxx = Math.min(Math.pow(2, tz+1) - 1, maxTileXY.tileX);
-      tmaxy = Math.min(Math.pow(2, tz+1) - 1, maxTileXY.tileY);
+      tmaxx = Math.min(Math.pow(2, tz + 1) - 1, maxTileXY.tileX);
+      tmaxy = Math.min(Math.pow(2, tz + 1) - 1, maxTileXY.tileY);
     }
     statistics.tileCount += (tmaxy - tminy + 1) * (tmaxx - tminx + 1);
     statistics.levelInfo[tz] = {
@@ -303,10 +303,12 @@ function main(tifFilePath, outputDir, options) {
     } else {
       overviewInfo = statistics.overviewInfos[tz];
     }
-    for (let i = tminy; i <= tmaxy; i++) {
-      // mapbox地形只认 xyz，不认tms，故直接写死
-      const ytile = getYtile(i, tz, true);
-      for (let j = tminx; j <= tmaxx; j++) {
+    for (let j = tminx; j <= tmaxx; j++) {
+      // 递归创建目录
+      mkdirsSync(path.join(outputDir, tz.toString(), j.toString()));
+      for (let i = tminy; i <= tmaxy; i++) {
+        // mapbox地形只认 xyz，不认tms，故直接写死
+        const ytile = getYtile(i, tz, true);
         // 由于裙边让周围多了1像素，由于切片是把xyz的地理范围数据编码到512上，所以256这里就是1，512这里就是0.5
         const tileBound = coordinateSys.tileBounds(j, i, tz, offset);
         const { rb, wb } = geoQuery(
