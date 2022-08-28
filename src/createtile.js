@@ -34,8 +34,6 @@ function createTile(createInfo, callback) {
     wb.ds = msmDS;
     writeTerrainTile(overviewInfo, rb, wb, [1, 2, 3]);
     const pngPath = path.join(outputTile, z.toString(), x.toString(), y + '.png');
-    //console.log(pngPath);
-    //createDirs(pngPath);
     if (pngDriver === null)
         pngDriver = getDriverByName('png');
     let pngDs = pngDriver.createCopy(pngPath, msmDS);
