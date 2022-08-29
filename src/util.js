@@ -53,6 +53,26 @@ function mkdirsSync(dirName) {
   }
 }
 
+
+/**
+ * 清空文件夹下所有文件
+ * @param {*} fold 
+ */
+function emptyDir(fold) {
+  const files = fs.readdirSync(fold);
+  files.forEach(file => {
+    const filePath = path.join(fold, file);
+    const stats = fs.statSync(filePath);
+    if (stats.isDirectory()) {
+      emptyDir(filePath);
+      fs.rmdirSync(filePath);
+    } else {
+      fs.unlinkSync(filePath);
+    }
+  });
+}
+
+
 module.exports = {
-  uuid, prettyTime, mkdirsSync
+  uuid, prettyTime, mkdirsSync, emptyDir
 }

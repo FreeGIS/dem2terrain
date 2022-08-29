@@ -13,10 +13,11 @@ program.name('dem2terrain')
 
 // --- 配置可选参数
 program
-  .option('-c, --epsg <number>', '3857 或 4490 或 4326| 默认 3857', '3857')
-  .option('-s, --size <number>', '指定生成瓦片的尺寸（256 或 512）| 默认 512 像素', '512')
-  .option('-z, --zoom <number-number>', '指定瓦片的等级生成范围。例如，想生成 7 ~ 12 级的瓦片，则输入 -z 7-12 | 默认值是 -z 5-14', '5-14')
-  .option('-e, --encoding <string>', '指定瓦片的数据编码规则（mapbox 或 terrarium）| 默认 -e mapbox', 'mapbox');
+  .option('-g, --epsg <number>', 'Tile适用坐标系，3857 | 4490 | 4326', 3857)
+  .option('-c, --clean <number>', '是否清空输出目录，0 | 1', 0)
+  .option('-s, --size <number>', '指定生成瓦片的尺寸,256 | 512', 512)
+  .option('-z, --zoom <number-number>', '指定瓦片的等级生成范围。例如，想生成 7 ~ 12 级的瓦片，则输入 -z 7-12', '5-14')
+  .option('-e, --encoding <string>', '指定瓦片的数据编码规则（mapbox 或 terrarium）', 'mapbox');
 
 // --- 解析参数
 program.parse();
@@ -36,6 +37,7 @@ const options = program.opts();
 const tileSize = Number(options['size']);
 const encoding = options['encoding'];
 const epsg = Number(options['epsg']);
+const isClean = Number(options['clean']);
 let zoom = options['zoom'];
 zoom = zoom.split('-');
 const minZoom = Number(zoom[0]);
@@ -55,7 +57,7 @@ const outFileAbsolutePath = path.isAbsolute(outputDir) ? outputDir : path.resolv
 const logMsg = `\n>> 开始转换...
 - 输入文件: ${inputAbsolutePath}
 - 输出路径: ${outFileAbsolutePath}
-- 瓦片适用坐标系: EPSG:${epsg}
+- Tile适用坐标系: EPSG:${epsg}
 - 瓦片编码: ${encoding === 'mapbox' ? 'mapbox(raster-dem)' : encoding}
 - 瓦片尺寸: ${tileSize} px
 - 瓦片等级: ${minZoom} 至 ${maxZoom} 级
@@ -67,5 +69,6 @@ main(inputDem, outputDir, {
   maxZoom,
   epsg,
   tileSize,
-  encoding
+  encoding,
+  isClean
 });

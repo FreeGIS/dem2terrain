@@ -18,7 +18,7 @@ class ProgressBar {
     ) {
         this.length = barLength;
         this.taskTotal = 0;
-        this.descriptionStyle = blue.bold(description);
+        this.description = description;
 
         //this.completed = 0;
         //this.tickStep = tickStep;
@@ -64,8 +64,9 @@ class ProgressBar {
 
         // 拼接最终文本
         const cmdtext = format(
-            ">> 步骤4: {} - {}% {}{} {}/{}",
+            "{}: {} - {}% {}{} {}/{}",
             [
+                this.description,
                 statusStyle,
                 percentStr,
                 cellStyle,

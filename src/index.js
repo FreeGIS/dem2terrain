@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const process = require('process');
 const os = require('os');
-const { prettyTime, uuid, mkdirsSync } = require('./util');
+const { prettyTime, uuid, mkdirsSync, emptyDir } = require('./util');
 const { reprojectImage } = require('./gdal-util');
 const { mapboxDem, terrariumDem } = require('./dem-encode');
 const CoordinateSys = require('./coordinateSys');
@@ -14,7 +14,7 @@ const workerFarm = require('./workfarm/index');
 const workers = workerFarm(require.resolve('./createtile'), ['createTile', 'closeDataset']);
 
 let childPids = new Set();
-const progressBar = new ProgressBar(60, '进度');
+let progressBar;
 let coordinateSys;
 /**
  * @typedef {{
@@ -243,12 +243,20 @@ function main(tifFilePath, outputDir, options) {
   // 计时开始
   const startTime = global.performance.now();
   // 结构可选参数
-  const { minZoom, maxZoom, epsg, tileSize, encoding } = options;
+  const { minZoom, maxZoom, epsg, tileSize, encoding, isClean } = options;
+  let stepIndex = 0;
+  //#region 步骤 1 - 高程值转 RGB，重新编码
+  if (isClean === 1) {
+    emptyDir(outputDir);
+    console.log(`>> 步骤${++stepIndex}: 清空输出文件夹 - 完成`);
+  }
+    
+  //#endregion
   coordinateSys = new CoordinateSys(epsg);
   const sourceDataset = gdal.open(tifFilePath, 'r');
   //#region 步骤 1 - 高程值转 RGB，重新编码
   statistics.encodedDsInfo = encodeDataset(sourceDataset, encoding, false);
-  console.log(`>> 步骤1: 重编码 - 完成`);
+  console.log(`>> 步骤${++stepIndex}: 重编码 - 完成`);
   //#endregion
 
   //#region 步骤 2 - 影像重投影
@@ -263,12 +271,12 @@ function main(tifFilePath, outputDir, options) {
   } else {
     dataset = encodeDs;
   }
-  console.log(`>> 步骤2: 重投影至 EPSG:${epsg} - 完成`);
+  console.log(`>> 步骤${++stepIndex}: 重投影至 EPSG:${epsg} - 完成`);
   //#endregion
 
   //#region 步骤 3 - 建立影像金字塔 由于地形通常是30m 90m精度
   const adjustZoom = buildPyramid(dataset, minZoom);
-  console.log('>> 步骤3: 构建影像金字塔索引 - 完成');
+  console.log(`>> 步骤${++stepIndex}: 构建影像金字塔索引 - 完成`);
   //#endregion
 
   //#region 步骤4 - 切片
@@ -300,6 +308,7 @@ function main(tifFilePath, outputDir, options) {
     };
   }
   // 设置进度条任务总数
+  progressBar = new ProgressBar(60, `>> 步骤${++stepIndex}`);
   progressBar.setTaskTotal(statistics.tileCount)
   // 实际裙边有1像素 256+1+1 上下左右各1像素
   // 裙边所需的缩放
