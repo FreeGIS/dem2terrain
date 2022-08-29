@@ -220,7 +220,7 @@ const buildPyramid = (
  */
 function main(tifFilePath, outputDir, options) {
   // 计时开始
-  const startTime = globalThis.performance.now();
+  const startTime = global.performance.now();
   // 结构可选参数
   const { minZoom, maxZoom, epsg, tileSize, encoding } = options;
   coordinateSys = new CoordinateSys(epsg);
@@ -340,7 +340,7 @@ function main(tifFilePath, outputDir, options) {
           // 更新进度条
           progressBar.render(statistics.completeCount);
           if (statistics.completeCount === statistics.tileCount) {
-            const endTime = globalThis.performance.now()
+            const endTime = global.performance.now()
             const {
               resultTime,
               unit

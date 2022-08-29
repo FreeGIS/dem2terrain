@@ -13,7 +13,7 @@ program.name('dem2terrain')
 
 // --- 配置可选参数
 program
-  .option('-c, --epsg <number>', '3857 或 4490 或 4326| 默认 3857', '3857')
+  // .option('-c, --epsg <number>', '3857 或 4490 或 4326| 默认 3857', '3857')
   .option('-s, --size <number>', '指定生成瓦片的尺寸（256 或 512）| 默认 512 像素', '512')
   .option('-z, --zoom <number-number>', '指定瓦片的等级生成范围。例如，想生成 7 ~ 12 级的瓦片，则输入 -z 7-12 | 默认值是 -z 5-14', '5-14')
   .option('-e, --encoding <string>', '指定瓦片的数据编码规则（mapbox 或 terrarium）| 默认 -e mapbox', 'mapbox');
