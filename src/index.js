@@ -1,6 +1,7 @@
 const gdal = require('gdal');
 const fs = require('fs');
 const path = require('path');
+const process = require('process');
 const os = require('os');
 const { prettyTime, uuid, mkdirsSync } = require('./util');
 const { reprojectImage } = require('./gdal-util');
@@ -44,10 +45,18 @@ let coordinateSys;
 
 /**
  * @typedef {{
+ *  ds: import('gdal').Dataset;
+ *  statue:number;
+ *  path: string;
+ * }} DsInfo
+ * 
+ * @typedef {{
  *   tileCount: number;
  *   overviewInfos: OverviewInfoDict;
  *   levelInfo: LevelInfoDict;
  *   completeCount: number;
+ *   encodedDsInfo: DsInfo;
+ *   projectDsInfo: DsInfo;
  * }} StatisticsInfo
  * 
  * @type {StatisticsInfo}
@@ -57,20 +66,42 @@ const statistics = {
   completeCount: 0,
   overviewInfos: {},
   levelInfo: {},
+  encodedDsInfo: undefined,
+  projectDsInfo: undefined
 }
-
+process.on('SIGINT', function () {
+  console.log('\n\n>> 清理临时文件中...');
+  if (statistics.encodedDsInfo !== undefined)
+    clearDsInfo(statistics.encodedDsInfo);
+  if (statistics.projectDsInfo !== undefined)
+    clearDsInfo(statistics.projectDsInfo);
+  console.log('>> 清理临时文件 - 完成');
+  process.exit();
+});
+/**
+ * 
+ * @param {DsInfo} dsinfo 数据集的元数据信息
+ */
+function clearDsInfo(dsinfo) {
+  // ds未关闭，强制关闭
+  if (dsinfo.statue === 1)
+    dsinfo.ds.close();
+  // 存在临时文件，强制删除
+  if (fs.existsSync(dsinfo)) {
+    fs.unlinkSync(dsinfo);
+  }
+}
 /**
  * 
  * @param {import('gdal').Dataset} sourceDataset gdal 直接读取的数据集 
  * @param {'mapbox' | 'terrarium'} encoding 编码格式
- * @returns {{
- *   encodeDataset: import('gdal').Dataset;
- *   encodedDatasetPath: string;
- * }} 编码后的数据集与临时文件路径
+ * @param {boolean} isClose 是否关闭数据集，默认true
+ * @returns {DsInfo} 编码后的数据集
  */
 const encodeDataset = (
   sourceDataset,
   encoding,
+  isClose = true
 ) => {
   const sourceWidth = sourceDataset.rasterSize.x;
   const sourceHeight = sourceDataset.rasterSize.y;
@@ -123,10 +154,12 @@ const encodeDataset = (
   encodedDataset.bands.get(3).pixels.write(0, 0, sourceWidth, sourceHeight, bChannelBuffer);
   // 刷入磁盘
   encodedDataset.flush();
-
+  if (isClose === true)
+    encodedDataset.close();
   return {
-    encodedDataset,
-    encodedDatasetPath,
+    ds: encodedDataset,
+    statue: (isClose),
+    path: encodedDatasetPath
   };
 }
 
@@ -134,32 +167,20 @@ const encodeDataset = (
  * 重投影数据集
  * @param {import('gdal').Dataset} encodedDataset 
  * @param {number} epsg 
- * @returns {{
- *   dataset: import('gdal').Dataset;
- *   projectDatasetPath: string;
- * }}
+ * @returns {
+ *   dataset: import('gdal').Dataset
+ * }
  */
 const project = (encodedDataset, epsg) => {
-  let sourceEPSG = encodedDataset.srs.getAuthorityCode();
-  let projectDatasetPath = void 0;
-  let dataset;
-  if (sourceEPSG !== epsg) {
-    // 数据源坐标系与目标坐标系不一致，需要预先投影 
-    projectDatasetPath = path.join(os.tmpdir(), `${uuid()}.tif`);
-    // 地形编码，非普通影像，采用最近邻采样重投影，避免出现尖尖问题
-    reprojectImage(encodedDataset, projectDatasetPath, epsg, 6);
-    dataset = gdal.open(projectDatasetPath, 'r');
-  } else {
-    dataset = encodedDataset;
-  }
-  // encode_ds会重投影，到此该数据集已经失去作用了，直接关闭！
-  if (sourceEPSG !== epsg) {
-    encodedDataset.close(projectDatasetPath);
-  }
+  let projectDatasetPath = path.join(os.tmpdir(), `${uuid()}.tif`);
+  // 地形编码，非普通影像，采用最近邻采样重投影，避免出现尖尖问题
+  reprojectImage(encodedDataset, projectDatasetPath, epsg, 6);
+  let dataset = gdal.open(projectDatasetPath, 'r');
   return {
-    projectDatasetPath,
-    dataset
-  }
+    ds: dataset,
+    statue: 1,
+    path: projectDatasetPath
+  };
 }
 
 /**
@@ -226,18 +247,22 @@ function main(tifFilePath, outputDir, options) {
   coordinateSys = new CoordinateSys(epsg);
   const sourceDataset = gdal.open(tifFilePath, 'r');
   //#region 步骤 1 - 高程值转 RGB，重新编码
-  const {
-    encodedDataset,
-    encodedDatasetPath,
-  } = encodeDataset(sourceDataset, encoding)
+  statistics.encodedDsInfo = encodeDataset(sourceDataset, encoding, false);
   console.log(`>> 步骤1: 重编码 - 完成`);
   //#endregion
 
   //#region 步骤 2 - 影像重投影
-  const {
-    dataset,
-    projectDatasetPath,
-  } = project(encodedDataset, epsg)
+  let dataset;
+  let encodeDs = statistics.encodedDsInfo.ds;
+  if (encodeDs.srs.getAuthorityCode() !== epsg) {
+    statistics.projectDsInfo = project(encodeDs, epsg);
+    // 重编码数据源失去作用，关闭，并更改状态
+    encodeDs.close();
+    statistics.encodedDsInfo.statue = 0;
+    dataset = statistics.projectDsInfo.ds;
+  } else {
+    dataset = encodeDs;
+  }
   console.log(`>> 步骤2: 重投影至 EPSG:${epsg} - 完成`);
   //#endregion
 
@@ -324,7 +349,7 @@ function main(tifFilePath, outputDir, options) {
           overviewInfo,
           rb,
           wb,
-          dsPath: projectDatasetPath,
+          dsPath: dataset.description,
           x: j,
           y: ytile,
           z: tz,
@@ -346,8 +371,6 @@ function main(tifFilePath, outputDir, options) {
               unit
             } = prettyTime(endTime - startTime)
             console.log(`\n\n转换完成，用时 ${resultTime.toFixed(2)} ${unit}。`)
-            // 关闭所有的数据源
-            dataset.close();
             //循环关闭子进程的ds，否则临时文件被占用删除不了
             const call = {
               method: 'closeDataset',
@@ -356,10 +379,11 @@ function main(tifFilePath, outputDir, options) {
                 if (childPids.size === 0) {
                   // 关闭子进程任务
                   workerFarm.end(workers);
-                  // 删除临时文件
-                  fs.unlinkSync(encodedDatasetPath);
-                  if (projectDatasetPath !== undefined)
-                    fs.unlinkSync(projectDatasetPath);
+                  // 清除数据源信息
+                  if (statistics.encodedDsInfo !== undefined)
+                    clearDsInfo(statistics.encodedDsInfo);
+                  if (statistics.projectDsInfo !== undefined)
+                    clearDsInfo(statistics.projectDsInfo);
                   resetStats();
                 }
               },
@@ -383,6 +407,8 @@ const resetStats = () => {
   statistics.completeCount = 0;
   statistics.levelInfo = {};
   statistics.overviewInfos = {};
+  statistics.encodedDsInfo = undefined;
+  statistics.projectDsInfo = undefined;
 }
 
 // 重构使其支持影像金字塔查询
