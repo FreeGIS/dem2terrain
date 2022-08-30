@@ -18,7 +18,15 @@
 
 # 1. 安装与配置
 
-## 1.1. 安装
+## 1.1. 配置 GDAL_DATA
+
+由于使用了 GDAL，用户需要 [下载 gdal-data.zip](./third-party/gdal-data.zip) 数据包，并配置 `GDAL_DATA` 环境变量为解压缩的目录。
+
+以 Windows 操作系统为例（此例直接使用 PostgreSQL 附带的资源，若用户有安装 PostgreSQL，也可以直接使用对应目录）：
+
+![配置环境变量](./doc/gdal-data.png)
+
+## 1.2. 安装
 
 从网络全局安装，成为命令行工具：
 
@@ -39,14 +47,6 @@ pnpm install && pnpm link --global
 ```
 
 安装完毕后就可以当普通命令行程序使用了。
-
-## 1.2. 配置 GDAL_DATA
-
-由于使用了 GDAL，用户需要 [下载 gdal-data.zip](./third-party/gdal-data.zip) 数据包，并配置 `GDAL_DATA` 环境变量为解压缩的目录。
-
-以 Windows 操作系统为例（此例直接使用 PostgreSQL 附带的资源，若用户有安装 PostgreSQL，也可以直接使用对应目录）：
-
-![配置环境变量](./doc/gdal-data.png)
 
 # 2. 用法与说明
 
