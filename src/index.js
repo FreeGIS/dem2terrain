@@ -128,24 +128,26 @@ const encodeDataset = (
   );
   encodedDataset.srs = sourceDataset.srs;
   encodedDataset.geoTransform = sourceDataset.geoTransform;
-  const rChannelBuffer = new Uint8Array(sourceWidth * sourceHeight);
-  const gChannelBuffer = new Uint8Array(sourceWidth * sourceHeight);
-  const bChannelBuffer = new Uint8Array(sourceWidth * sourceHeight);
+  const channelLength = sourceWidth * sourceHeight;
+  const rChannelBuffer = new Uint8Array(channelLength);
+  const gChannelBuffer = new Uint8Array(channelLength);
+  const bChannelBuffer = new Uint8Array(channelLength);
+  function forEachHeightBuffer(heightBuffer, encode) {
+    const TEMPCOLOR = [1, 1, 1];
+    for (let i = 0, len = heightBuffer.length; i < len; i++) {
+      if (encode) {
+        const color = encode(heightBuffer[i], TEMPCOLOR);
+        rChannelBuffer[i] = color[0];
+        gChannelBuffer[i] = color[1];
+        bChannelBuffer[i] = color[2];
+      }
+    }
+  }
   // 循环高程，转rgb编码
   if (encoding === 'mapbox') {
-    heightBuffer.forEach((height, i) => {
-      const color = mapboxDem.encode(height);
-      rChannelBuffer[i] = color[0];
-      gChannelBuffer[i] = color[1];
-      bChannelBuffer[i] = color[2];
-    })
+    forEachHeightBuffer(heightBuffer, mapboxDem.encode);
   } else if (encoding === 'terrarium') {
-    heightBuffer.forEach((height, i) => {
-      const color = terrariumDem.encode(height);
-      rChannelBuffer[i] = color[0];
-      gChannelBuffer[i] = color[1];
-      bChannelBuffer[i] = color[2];
-    })
+    forEachHeightBuffer(heightBuffer, terrariumDem.encode);
   }
 
   // 写入像素值
@@ -250,7 +252,7 @@ function main(tifFilePath, outputDir, options) {
     emptyDir(outputDir);
     console.log(`>> 步骤${++stepIndex}: 清空输出文件夹 - 完成`);
   }
-    
+
   //#endregion
   coordinateSys = new CoordinateSys(epsg);
   const sourceDataset = gdal.open(tifFilePath, 'r');
