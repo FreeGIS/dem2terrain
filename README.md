@@ -85,7 +85,7 @@ Options:
 
 方式1：通过命令行参数执行任务
 ```bash
-dem2terrain -z 4-15 -s 256 -e terrarium ./ZONE.tiff ./output -c 1 -g 3857
+dem2terrain -z 4-15 -s 256 -e terrarium -i ./ZONE.tiff -o ./output -c 1 -g 3857
 ```
 
 方式2：通过配置文件执行任务
