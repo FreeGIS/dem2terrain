@@ -79,12 +79,31 @@ Options:
 - `-s`: 指定输出瓦片的尺寸，默认是 512 像素；
 - `-c`: 指定是否预先清理输出瓦片的存储目录，默认0，不清理；
 - `-e`: 指定切片编码规则，默认 mapbox，用户可指定 terrarium 规则输出。
-- `-f`: 以上参数可以放到一个配置json文件里，使用-f执行切片任务；
+- `-f`: 以上参数可以都放到一个配置json文件里，使用-f执行切片任务，简化操作；
 
 举例：
 
+方式1：通过命令行参数执行任务
 ```bash
 dem2terrain -z 4-15 -s 256 -e terrarium ./ZONE.tiff ./output -c 1 -g 3857
+```
+
+方式2：通过配置文件执行任务
+1）配置参数
+```
+{
+    "zoom":"5-13",
+    "epsg": 3857,
+    "size": 512,
+    "encoding": "mapbox",
+    "input": "./data/xxx.tif",
+    "output": "./data/tile",
+    "clean": true
+}
+```
+2）执行任务
+```bash
+dem2terrain -f d://config.json
 ```
 
 # 3. 使用输出成果
