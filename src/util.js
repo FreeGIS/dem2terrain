@@ -59,6 +59,8 @@ function mkdirsSync(dirName) {
  * @param {*} fold 
  */
 function emptyDir(fold) {
+  if(fs.existsSync(fold)===false)
+    return;
   const files = fs.readdirSync(fold);
   files.forEach(file => {
     const filePath = path.join(fold, file);
