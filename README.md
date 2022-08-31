@@ -54,30 +54,32 @@ pnpm install && pnpm link --global
 
 ```plaintext
 > dem2terrain --help
-Usage: dem2terrain [options] <input-tiff-file> <output-directory>
+Usage: dem2terrain [options]
 
 使用 GDAL 制作地形瓦片，支持 mapbox 和 terrarium 两种编码输出格式，当前仅输出 PNG 容器格式。
 
-Arguments:
-  input-tiff-file             输入 tif 格式的 DEM 文件路径，支持相对路径
-  output-directory            输出目录，支持相对路径
-
 Options:
   -v, --version               当前版本
-  -g, --epsg <number>         Tile适用坐标系，3857 | 4490 | 4326 (default: 3857)
-  -c, --clean <number>        是否清空输出目录，0 | 1 (default: 0)
-  -s, --size <number>         指定生成瓦片的尺寸,256 | 512 (default: 512)
-  -z, --zoom <number-number>  指定瓦片的等级生成范围。例如，想生成 7 ~ 12 级的瓦片，则输入 -z 7-12 (default: "5-14")
-  -e, --encoding <string>     指定瓦片的数据编码规则（mapbox 或 terrarium） (default: "mapbox")
+  -i, --input <string>        <必填> 输入 tif 格式的 DEM 文件路径，支持相对路径
+  -o, --output <string>       <必填> 输出目录，支持相对路径
+  -f, --configFile <File>     <可选> 通过配置文件执行任务，输入绝对路径，可参考配置模板
+  -g, --epsg <number>         <可选> Tile适用坐标系，3857 | 4490 | 4326 (default: 3857)
+  -c, --clean <number>        <可选> 是否清空输出目录，0 | 1 (default: 0)
+  -s, --size <number>         <可选> 指定生成瓦片的尺寸,256 | 512 (default: 512)
+  -z, --zoom <number-number>  <可选> 指定瓦片的等级生成范围。例如，想生成 7 ~ 12 级的瓦片，则输入 -z 7-12 (default: "5-14")
+  -e, --encoding <string>     <可选> 指定瓦片的数据编码规则（mapbox 或 terrarium） (default: "mapbox")
   -h, --help                  帮助
 ```
 
 可选参数说明：
+- `-i`: 输入 tif 格式的 DEM 文件路径，支持相对路径；
+- `-o`: 输出目录，支持相对路径；
 - `-g`: 指定地形Tile适用坐标系，默认是适用3857坐标系；
 - `-z`: 由于地形栅格数据通常是 90m、30m 的空间分辨率，等级太大意义不大，等级太低时起伏辨识也不高，所以默认生成中间的 `5-14` 级；
 - `-s`: 指定输出瓦片的尺寸，默认是 512 像素；
 - `-c`: 指定是否预先清理输出瓦片的存储目录，默认0，不清理；
 - `-e`: 指定切片编码规则，默认 mapbox，用户可指定 terrarium 规则输出。
+- `-f`: 以上参数可以放到一个配置json文件里，使用-f执行切片任务；
 
 举例：
 
