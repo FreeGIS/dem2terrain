@@ -1,9 +1,9 @@
 {
-    "zoom":"5-13",
+    "zoom":"5-11",
     "epsg": 3857,
     "size": 512,
     "encoding": "mapbox",
     "input": "./data/xxx.tif",
-    "output": "./data/tile",
+    "output": "./data/xxx.mbtiles",
     "clean": true
 }

@@ -8,7 +8,7 @@ const { reprojectImage } = require('./gdal-util');
 const { mapboxDem, terrariumDem } = require('./dem-encode');
 const CoordinateSys = require('./coordinateSys');
 const ProgressBar = require('./progressbar/index');
-
+const { mb_open, mb_stop_writing, mb_put_tile } = require('./mbtiles-util');
 // 创建一个线程池
 const workerFarm = require('./workfarm/index');
 const workers = workerFarm(require.resolve('./createtile'), ['createTile', 'closeDataset']);
@@ -46,7 +46,6 @@ let coordinateSys;
 /**
  * @typedef {{
  *  ds: import('gdal').Dataset;
- *  statue:number;
  *  path: string;
  * }} DsInfo
  * 
@@ -55,26 +54,22 @@ let coordinateSys;
  *   overviewInfos: OverviewInfoDict;
  *   levelInfo: LevelInfoDict;
  *   completeCount: number;
- *   encodedDsInfo: DsInfo;
- *   projectDsInfo: DsInfo;
  * }} StatisticsInfo
  * 
  * @type {StatisticsInfo}
  */
-const statistics = {
+let statistics = {
   tileCount: 0,
   completeCount: 0,
   overviewInfos: {},
-  levelInfo: {},
-  encodedDsInfo: undefined,
-  projectDsInfo: undefined
+  levelInfo: {}
 }
 process.on('SIGINT', function () {
   console.log('\n\n>> 清理临时文件中...');
-  if (statistics.encodedDsInfo !== undefined)
-    clearDsInfo(statistics.encodedDsInfo);
-  if (statistics.projectDsInfo !== undefined)
-    clearDsInfo(statistics.projectDsInfo);
+  if (encodedDsInfo !== null)
+    clearDsInfo(encodedDsInfo);
+  if (projectDsInfo !== null)
+    clearDsInfo(projectDsInfo);
   console.log('>> 清理临时文件 - 完成');
   process.exit();
 });
@@ -83,13 +78,18 @@ process.on('SIGINT', function () {
  * @param {DsInfo} dsinfo 数据集的元数据信息
  */
 function clearDsInfo(dsinfo) {
+  if (dsinfo === null)
+    return;
   // ds未关闭，强制关闭
-  if (dsinfo.statue === 1)
-    dsinfo.ds.close();
+  dsinfo.ds.close();
   // 存在临时文件，强制删除
-  if (fs.existsSync(dsinfo)) {
-    fs.unlinkSync(dsinfo);
-  }
+  if (fs.existsSync(dsinfo.path))
+    fs.unlinkSync(dsinfo.path);
+  // 存在临时影像金字塔附属文件
+  const ovrPath = dsinfo.path + '.ovr';
+  if (fs.existsSync(ovrPath))
+    fs.unlinkSync(ovrPath);
+  dsinfo = null;
 }
 /**
  * 
@@ -156,11 +156,8 @@ const encodeDataset = (
   encodedDataset.bands.get(3).pixels.write(0, 0, sourceWidth, sourceHeight, bChannelBuffer);
   // 刷入磁盘
   encodedDataset.flush();
-  if (isClose === true)
-    encodedDataset.close();
   return {
     ds: encodedDataset,
-    statue: (isClose),
     path: encodedDatasetPath
   };
 }
@@ -180,7 +177,6 @@ const project = (encodedDataset, epsg) => {
   let dataset = gdal.open(projectDatasetPath, 'r');
   return {
     ds: dataset,
-    statue: 1,
     path: projectDatasetPath
   };
 }
@@ -229,10 +225,13 @@ const buildPyramid = (
 
   return adjustZoom
 }
+
+
+let encodedDsInfo = null, projectDsInfo = null;
 /**
  * 
- * @param {string} tifFilePath TIF 文件路径
- * @param {string} outputDir 输出目录
+ * @param {string} input 输入的TIF 文件路径
+ * @param {string} output 输出的切片文件目录或mbtiles文件路径
  * @param {{
  *   minZoom: number;
  *   maxZoom: number;
@@ -241,35 +240,43 @@ const buildPyramid = (
  *   encoding: 'mapbox' | 'terrarium';
  * }} options 可选配置
  */
-function main(tifFilePath, outputDir, options) {
+function main(input, output, options) {
   // 计时开始
   const startTime = global.performance.now();
   // 结构可选参数
   const { minZoom, maxZoom, epsg, tileSize, encoding, isClean } = options;
+  // 判断是否以mbtiles转储
+  const isSavaMbtiles = (path.extname(output) === '.mbtiles');
+  // 定义切片临时输出目录
+  let outputDir = output;
+  // 如果以mbtiles存储重定向为临时目录
+  if (isSavaMbtiles === true)
+    outputDir = path.join(os.tmpdir(), uuid());
+
   let stepIndex = 0;
   //#region 步骤 1 - 高程值转 RGB，重新编码
   if (isClean === 1) {
-    emptyDir(outputDir);
+    if (isSavaMbtiles === true && fs.existsSync(output))
+      fs.unlinkSync(output);
+    else
+      emptyDir(output);
     console.log(`>> 步骤${++stepIndex}: 清空输出文件夹 - 完成`);
   }
 
   //#endregion
   coordinateSys = new CoordinateSys(epsg);
-  const sourceDataset = gdal.open(tifFilePath, 'r');
+  const sourceDataset = gdal.open(input, 'r');
   //#region 步骤 1 - 高程值转 RGB，重新编码
-  statistics.encodedDsInfo = encodeDataset(sourceDataset, encoding, false);
+  encodedDsInfo = encodeDataset(sourceDataset, encoding, false);
   console.log(`>> 步骤${++stepIndex}: 重编码 - 完成`);
   //#endregion
 
   //#region 步骤 2 - 影像重投影
   let dataset;
-  let encodeDs = statistics.encodedDsInfo.ds;
+  let encodeDs = encodedDsInfo.ds;
   if (encodeDs.srs.getAuthorityCode() !== epsg) {
-    statistics.projectDsInfo = project(encodeDs, epsg);
-    // 重编码数据源失去作用，关闭，并更改状态
-    encodeDs.close();
-    statistics.encodedDsInfo.statue = 0;
-    dataset = statistics.projectDsInfo.ds;
+    projectDsInfo = project(encodeDs, epsg);
+    dataset = projectDsInfo.ds;
   } else {
     dataset = encodeDs;
   }
@@ -282,15 +289,21 @@ function main(tifFilePath, outputDir, options) {
   //#endregion
 
   //#region 步骤4 - 切片
-  const ominx = dataset.geoTransform[0];
-  const omaxx = dataset.geoTransform[0] + dataset.rasterSize.x * dataset.geoTransform[1];
-  const omaxy = dataset.geoTransform[3];
-  const ominy = dataset.geoTransform[3] + dataset.rasterSize.y * dataset.geoTransform[5];
-
+  const dsInfo = {
+    width: dataset.rasterSize.x,
+    height: dataset.rasterSize.y,
+    resX: dataset.geoTransform[1],
+    resY: dataset.geoTransform[5],
+    startX: dataset.geoTransform[0],
+    startY: dataset.geoTransform[3] + dataset.rasterSize.y * dataset.geoTransform[5],
+    endX: dataset.geoTransform[0] + dataset.rasterSize.x * dataset.geoTransform[1],
+    endY: dataset.geoTransform[3],
+    path: dataset.description
+  }
   // 计算切片总数
   for (let tz = minZoom; tz <= maxZoom; ++tz) {
-    const minTileXY = coordinateSys.point2Tile(ominx, ominy, tz);
-    const maxTileXY = coordinateSys.point2Tile(omaxx, omaxy, tz);
+    const minTileXY = coordinateSys.point2Tile(dsInfo.startX, dsInfo.startY, tz);
+    const maxTileXY = coordinateSys.point2Tile(dsInfo.endX, dsInfo.endY, tz);
     const tminx = Math.max(0, minTileXY.tileX);
     const tminy = Math.max(0, minTileXY.tileY);
     let tmaxx;
@@ -327,18 +340,10 @@ function main(tifFilePath, outputDir, options) {
      */
     let overviewInfo;
     // 根据z获取宽高和分辨率信息
-    if (tz >= adjustZoom) {
-      overviewInfo = {
-        startX: dataset.geoTransform[0],
-        startY: dataset.geoTransform[3],
-        resX: dataset.geoTransform[1],
-        resY: dataset.geoTransform[5],
-        width: dataset.rasterSize.x,
-        height: dataset.rasterSize.y
-      }
-    } else {
+    if (tz >= adjustZoom)
+      overviewInfo = dsInfo;
+    else
       overviewInfo = statistics.overviewInfos[tz];
-    }
     for (let j = tminx; j <= tmaxx; j++) {
       // 递归创建目录
       mkdirsSync(path.join(outputDir, tz.toString(), j.toString()));
@@ -360,13 +365,13 @@ function main(tifFilePath, outputDir, options) {
           overviewInfo,
           rb,
           wb,
-          dsPath: dataset.description,
+          dsPath: dsInfo.path,
           x: j,
           y: ytile,
           z: tz,
           outputTile: outputDir
         };
-        workers.createTile(createInfo, function (err, pid) {
+        workers.createTile(createInfo, async function (err, pid) {
           if (err) {
             console.log(err);
           }
@@ -376,12 +381,19 @@ function main(tifFilePath, outputDir, options) {
           // 更新进度条
           progressBar.render(statistics.completeCount);
           if (statistics.completeCount === statistics.tileCount) {
-            const endTime = global.performance.now()
+            // 转储mbtiles
+            if(isSavaMbtiles===true){
+              await importMbtiles(outputDir, output);
+              console.log(`\n>> 步骤${++stepIndex}: 转储mbtiles - 完成`);
+            }
+            const endTime = global.performance.now();
             const {
               resultTime,
               unit
             } = prettyTime(endTime - startTime)
-            console.log(`\n\n转换完成，用时 ${resultTime.toFixed(2)} ${unit}。`)
+            console.log(`\n\n转换完成，用时 ${resultTime.toFixed(2)} ${unit}。`);
+
+            console.log(statistics.tileCount);
             //循环关闭子进程的ds，否则临时文件被占用删除不了
             const call = {
               method: 'closeDataset',
@@ -391,10 +403,8 @@ function main(tifFilePath, outputDir, options) {
                   // 关闭子进程任务
                   workerFarm.end(workers);
                   // 清除数据源信息
-                  if (statistics.encodedDsInfo !== undefined)
-                    clearDsInfo(statistics.encodedDsInfo);
-                  if (statistics.projectDsInfo !== undefined)
-                    clearDsInfo(statistics.projectDsInfo);
+                  clearDsInfo(encodedDsInfo);
+                  clearDsInfo(projectDsInfo);
                   resetStats();
                 }
               },
@@ -418,8 +428,6 @@ const resetStats = () => {
   statistics.completeCount = 0;
   statistics.levelInfo = {};
   statistics.overviewInfos = {};
-  statistics.encodedDsInfo = undefined;
-  statistics.projectDsInfo = undefined;
 }
 
 // 重构使其支持影像金字塔查询
@@ -502,5 +510,55 @@ function getYtile(ty, tz, tms2xyz = true) {
   if (tms2xyz)
     return Math.pow(2, tz) - 1 - ty;
   return ty;
+}
+
+
+/**
+ * 将目录里的切片导入mbtiles，删除文件目录
+ * @param {number} tileDir 
+ * @param {number} mbtilesPath 
+ * @returns {Promise}
+ */
+ function importMbtiles(tileDir, mbtilesPath) {
+  return new Promise(async (res, rej) => {
+    let mbtiles = await mb_open(mbtilesPath, 'rwc');
+    // 遍历tile目录的tile，并转储至mbtiles
+    let z, x, y;
+    const zFolds = fs.readdirSync(tileDir);
+    const zCount = zFolds.length;
+    for (let i = 0; i < zCount; i++) {
+      let zFold = zFolds[i];
+      z = Number(zFold);
+      const zPath = path.join(tileDir, zFold);
+      // 遍历z下的x文件夹
+      const xFolds = fs.readdirSync(zPath);
+      const xCount = xFolds.length;
+      for (let j = 0; j < xCount; j++) {
+        let xFold = xFolds[j];
+        x = Number(xFold);
+        // 遍历x文件夹下的y文件
+        const xPath = path.join(zPath, xFold);
+        const yFiles = fs.readdirSync(xPath);
+
+        const yCount = yFiles.length;
+        // 每10个一批写入，否则sqlite容易报错database lock
+        let promises = [];
+        for (let k = 0; k < yCount; k++) {
+          const yFile = yFiles[k];
+          y = Number(yFile.split('.')[0]);
+          const yPath = path.join(xPath, yFile);
+          promises.push(mb_put_tile(mbtiles, z, x, y, yPath));
+        }
+        await Promise.all(promises);
+        promises = [];
+        // 删除目录
+        fs.rmdirSync(xPath);
+      }
+      fs.rmdirSync(zPath);
+    }
+    fs.rmdirSync(tileDir);
+    await mb_stop_writing(mbtiles);
+    res('import');
+  });
 }
 module.exports = main;
