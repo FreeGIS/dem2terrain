@@ -1,6 +1,6 @@
 {
   "name": "dem2terrain",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "使用 GDAL 制作 DEM 栅格的地形瓦片",
   "main": "index.js",
   "preferGlobal": true,
@@ -29,6 +29,7 @@
   },
   "homepage": "https://github.com/FreeGIS/dem2terrain#readme",
   "dependencies": {
+    "@mapbox/mbtiles": "^0.12.1",
     "cli-color": "^2.0.3",
     "commander": "^9.4.0",
     "errno": "^1.0.0",
