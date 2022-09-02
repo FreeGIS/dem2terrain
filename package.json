@@ -1,6 +1,6 @@
 {
   "name": "dem2terrain",
-  "version": "1.0.7",
+  "version": "2.0.0",
   "description": "使用 GDAL 制作 DEM 栅格的地形瓦片",
   "main": "index.js",
   "preferGlobal": true,
@@ -33,7 +33,7 @@
     "cli-color": "^2.0.3",
     "commander": "^9.4.0",
     "errno": "^1.0.0",
-    "gdal": "^0.11.1",
+    "gdal-async": "^3.5.1",
     "single-line-log": "^1.1.2"
   }
 }

@@ -1,4 +1,4 @@
-const gdal = require('gdal');
+const gdal = require('gdal-async');
 const fs = require('fs');
 const path = require('path');
 const process = require('process');
@@ -202,26 +202,34 @@ const buildPyramid = (
     }
   }
 
+  // ds如果能塞进一个Tile（256*256），就不用再细分overviewInfo下去
+  const maxPixel = Math.max(dataset.rasterSize.x, dataset.rasterSize.y) * 1.0;
+
   /**
    * @type {number[]}
    */
-  let overviews = [];
+  let overviews = [], factor, overviewInfo, isCalOverInfo = true;
   for (let i = adjustZoom - 1; i >= minZoom; i--) {
-    const factor = Math.pow(2, adjustZoom - i);
-    overviews.push(factor);
-    // zoom级别对应overviews索引
-    statistics.overviewInfos[i] = {
-      index: adjustZoom - i - 1,
-      startX: dataset.geoTransform[0],
-      startY: dataset.geoTransform[3],
-      width: Math.ceil(dataset.rasterSize.x * 1.0 / factor),
-      height: Math.ceil(dataset.rasterSize.y * 1.0 / factor),
-      resX: dataset.geoTransform[1] * factor,
-      resY: dataset.geoTransform[5] * factor
-    };
+    if (isCalOverInfo) {
+      factor = Math.pow(2, adjustZoom - i);
+      overviews.push(factor);
+      // zoom级别对应overviews索引
+      overviewInfo = {
+        index: adjustZoom - i - 1,
+        startX: dataset.geoTransform[0],
+        startY: dataset.geoTransform[3],
+        width: Math.ceil(dataset.rasterSize.x * 1.0 / factor),
+        height: Math.ceil(dataset.rasterSize.y * 1.0 / factor),
+        resX: dataset.geoTransform[1] * factor,
+        resY: dataset.geoTransform[5] * factor
+      };
+    }
+    statistics.overviewInfos[i] = overviewInfo;
+    // 单个Tile是256*256的，如果raster几轮缩小，已经小于单张Tile，就不再缩小了。
+    if (isCalOverInfo === true && maxPixel / factor < 256)
+      isCalOverInfo = false;
   }
   dataset.buildOverviews('NEAREST', overviews);
-
   return adjustZoom
 }
 /**
@@ -265,6 +273,7 @@ function main(input, output, options) {
   const sourceDataset = gdal.open(input, 'r');
   //#region 步骤 1 - 高程值转 RGB，重新编码
   encodedDsInfo = encodeDataset(sourceDataset, encoding);
+  sourceDataset.close();
   console.log(`>> 步骤${++stepIndex}: 重编码 - 完成`);
   //#endregion
   //#region 步骤 2 - 影像重投影

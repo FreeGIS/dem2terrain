@@ -1,4 +1,4 @@
-const gdal = require('gdal');
+const gdal = require('gdal-async');
 const { getDriverByName } = require('./gdal-util');
 const path = require('path');
 function writeTerrainTile(overviewInfo, readinfo, writeinfo, bandnums) {

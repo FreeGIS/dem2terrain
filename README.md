@@ -165,15 +165,58 @@ map.addSource('my-custom-terrain', {
 
 欢迎参与贡献，包括但不限于文档、功能扩展、性能优化！
 
-# 5. 知识补充
+# 5. 安装问题
 
-## 5.1. 参考资料
+## 5.1 c++编译环境问题
+
+由于node-gdal、node-gdal-next或node-gdal-async都会内置编译安装一个gdal，编译是需要依赖c++环境的，在win上常出现问题如下：
+```bash
+npm ERR! gyp ERR! stack Error: Could not find any Visual Studio installation to use
+```
+如果用户未安装vs c++环境，请最好安装下vs c++编译环境。
+如果用户已经安装了vs，例如vs2022仍提示找不到，配置如下：
+```bash
+# 配置npm的msvs版本号，例如安装了vs 2022
+npm config set msvs_version 2022
+# 更新下node-gyp
+npm install node-gyp@latest -g
+```
+## 5.2 环境变量冲突
+在node-gdal系列相关包npm安装成功后，使用过程中遇到投影操作定义就会报各种错误，典型错误如下：
+```
+const srs= gdal.SpatialReference.fromProj4('+init=epsg:4326'); ^ Error: Corrupt Data
+```
+主要原因是win上各种软件包都会内置安装，环境变量冲突导致。
+
+例如，用户安装了PostGIS，会内置安装proj,geos,gdal并自动生成proj_lib的环境变量。
+```
+PROJ_LIB=C:\Program Files\PostgreSQL\14\share\contrib\postgis-3.1\proj
+```
+当安装node-gdal-next或noe-gdal-async时，内置的proj和proj.db由于冲突不能生效，就会在使用过程中报各种错误。
+依此类推，如果用户安装了独立的GDAL，又有内置的proj，geos和环境变量也会有这种问题。
+解决办法：从系统环境变量中删除这些冲突的环境变量重启机器即可。
+
+## 5.3 最好的办法
+使用本机已编译好的gdal编译binding下node的gdal环境：
+```
+npm install gdal-next --build-from-source --shared_gdal
+
+npm install gdal-async --build-from-source --shared_gdal
+```
+
+这样，node的gdal环境可以和本机的gdal环境一致，能使用更多的驱动例如webp，内置驱动是没有的。
+这种操作可以让公用软件装一次，不会产生更多的冲突，linux上很方便。但由于windows上都不是源码编译，从.exe安装，因此不太适用。该操作适合c++编译环境熟悉的高级用户可定制安装多项扩展。
+
+
+# 6. 知识补充
+
+## 6.1. 参考资料
 
 - [GitHub - tilezen/joerd - terrarium](https://github.com/tilezen/joerd/blob/master/docs/formats.md#terrarium)
 
 - [MapboxDocs - raster-dem](https://docs.mapbox.com/data/tilesets/reference/mapbox-terrain-dem-v1/)
 
-## 5.2. 编解码差异
+## 6.2. 编解码差异
 
 `mapbox` 和 `terrarium` 都将高程值编码成 RGB 数组存储，下面以简单的编解码函数说明两种编码格式的差异。
 

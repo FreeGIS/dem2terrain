@@ -1,4 +1,4 @@
-const gdal = require('gdal');
+const gdal = require('gdal-async');
 
 /**
  * 根据驱动名称（支持任意大小写）获取 GDAL 驱动
