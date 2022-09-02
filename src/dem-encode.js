@@ -1,20 +1,13 @@
 /**
  * MapboxGL raster-dem 编码
  * @param {number} height 高程值
- * @param {array} out 输出值,用来存放输出结果
  * @returns {[number, number, number]}
  */
-function mapboxEncode(height, out) {
+function mapboxEncode(height) {
     const value = Math.floor((height + 10000) * 10);
     const r = value >> 16;
     const g = value >> 8 & 0x0000FF;
     const b = value & 0x0000FF;
-    if (out) {
-        out[0] = r;
-        out[1] = g;
-        out[2] = b;
-        return out;
-    }
     return [r, g, b];
 }
 
@@ -31,20 +24,13 @@ function mapboxDecode(color) {
 /**
  * Terrarium 编码
  * @param {number} height 高程值
- * @param {array} out 输出值,用来存放输出结果
  * @returns {[number, number, number]}
  */
-function terrariumEncode(height, out) {
+function terrariumEncode(height) {
     height += 32768;
     const r = Math.floor(height / 256.0);
     const g = Math.floor(height % 256);
     const b = Math.floor((height - Math.floor(height)) * 256.0);
-    if (out) {
-        out[0] = r;
-        out[1] = g;
-        out[2] = b;
-        return out;
-    }
     return [r, g, b];
 }
 

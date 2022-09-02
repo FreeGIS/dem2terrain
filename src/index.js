@@ -95,13 +95,11 @@ function clearDsInfo(dsinfo) {
  * 
  * @param {import('gdal').Dataset} sourceDataset gdal 直接读取的数据集 
  * @param {'mapbox' | 'terrarium'} encoding 编码格式
- * @param {boolean} isClose 是否关闭数据集，默认true
  * @returns {DsInfo} 编码后的数据集
  */
 const encodeDataset = (
   sourceDataset,
-  encoding,
-  isClose = true
+  encoding
 ) => {
   const sourceWidth = sourceDataset.rasterSize.x;
   const sourceHeight = sourceDataset.rasterSize.y;
@@ -181,6 +179,7 @@ const project = (encodedDataset, epsg) => {
   };
 }
 
+
 /**
  * 
  * @param {import('gdal').Dataset} dataset
@@ -225,13 +224,10 @@ const buildPyramid = (
 
   return adjustZoom
 }
-
-
-let encodedDsInfo = null, projectDsInfo = null;
 /**
  * 
- * @param {string} input 输入的TIF 文件路径
- * @param {string} output 输出的切片文件目录或mbtiles文件路径
+ * @param {string} tifFilePath TIF 文件路径
+ * @param {string} outputDir 输出目录
  * @param {{
  *   minZoom: number;
  *   maxZoom: number;
@@ -243,6 +239,7 @@ let encodedDsInfo = null, projectDsInfo = null;
 function main(input, output, options) {
   // 计时开始
   const startTime = global.performance.now();
+  // 结构可选参数
   // 结构可选参数
   const { minZoom, maxZoom, epsg, tileSize, encoding, isClean } = options;
   // 判断是否以mbtiles转储
@@ -267,10 +264,9 @@ function main(input, output, options) {
   coordinateSys = new CoordinateSys(epsg);
   const sourceDataset = gdal.open(input, 'r');
   //#region 步骤 1 - 高程值转 RGB，重新编码
-  encodedDsInfo = encodeDataset(sourceDataset, encoding, false);
+  encodedDsInfo = encodeDataset(sourceDataset, encoding);
   console.log(`>> 步骤${++stepIndex}: 重编码 - 完成`);
   //#endregion
-
   //#region 步骤 2 - 影像重投影
   let dataset;
   let encodeDs = encodedDsInfo.ds;
@@ -282,6 +278,7 @@ function main(input, output, options) {
   }
   console.log(`>> 步骤${++stepIndex}: 重投影至 EPSG:${epsg} - 完成`);
   //#endregion
+
 
   //#region 步骤 3 - 建立影像金字塔 由于地形通常是30m 90m精度
   const adjustZoom = buildPyramid(dataset, minZoom);
@@ -340,10 +337,18 @@ function main(input, output, options) {
      */
     let overviewInfo;
     // 根据z获取宽高和分辨率信息
-    if (tz >= adjustZoom)
-      overviewInfo = dsInfo;
-    else
+    if (tz >= adjustZoom) {
+      overviewInfo = {
+        startX: dataset.geoTransform[0],
+        startY: dataset.geoTransform[3],
+        resX: dataset.geoTransform[1],
+        resY: dataset.geoTransform[5],
+        width: dataset.rasterSize.x,
+        height: dataset.rasterSize.y
+      }
+    } else {
       overviewInfo = statistics.overviewInfos[tz];
+    }
     for (let j = tminx; j <= tmaxx; j++) {
       // 递归创建目录
       mkdirsSync(path.join(outputDir, tz.toString(), j.toString()));
@@ -365,7 +370,7 @@ function main(input, output, options) {
           overviewInfo,
           rb,
           wb,
-          dsPath: dsInfo.path,
+          dsPath: dataset.description,
           x: j,
           y: ytile,
           z: tz,
@@ -382,18 +387,16 @@ function main(input, output, options) {
           progressBar.render(statistics.completeCount);
           if (statistics.completeCount === statistics.tileCount) {
             // 转储mbtiles
-            if(isSavaMbtiles===true){
+            if (isSavaMbtiles === true) {
               await importMbtiles(outputDir, output);
               console.log(`\n>> 步骤${++stepIndex}: 转储mbtiles - 完成`);
             }
-            const endTime = global.performance.now();
+            const endTime = global.performance.now()
             const {
               resultTime,
               unit
             } = prettyTime(endTime - startTime)
-            console.log(`\n\n转换完成，用时 ${resultTime.toFixed(2)} ${unit}。`);
-
-            console.log(statistics.tileCount);
+            console.log(`\n\n转换完成，用时 ${resultTime.toFixed(2)} ${unit}。`)
             //循环关闭子进程的ds，否则临时文件被占用删除不了
             const call = {
               method: 'closeDataset',
@@ -428,6 +431,8 @@ const resetStats = () => {
   statistics.completeCount = 0;
   statistics.levelInfo = {};
   statistics.overviewInfos = {};
+  statistics.encodedDsInfo = undefined;
+  statistics.projectDsInfo = undefined;
 }
 
 // 重构使其支持影像金字塔查询
@@ -519,7 +524,7 @@ function getYtile(ty, tz, tms2xyz = true) {
  * @param {number} mbtilesPath 
  * @returns {Promise}
  */
- function importMbtiles(tileDir, mbtilesPath) {
+function importMbtiles(tileDir, mbtilesPath) {
   return new Promise(async (res, rej) => {
     let mbtiles = await mb_open(mbtilesPath, 'rwc');
     // 遍历tile目录的tile，并转储至mbtiles
