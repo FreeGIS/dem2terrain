@@ -12,7 +12,7 @@ function getDriverByName(driverName) {
     const driver = gdal.drivers.get(i);
     if (driver.description === nameNormal) { return driver; }
   }
-  throw new Error(`当前gdal种不存在输入的驱动名称${nameNormal}`);
+  throw new Error(`当前gdal中不存在输入的驱动名称${nameNormal}`);
 }
 /**
  * @function 栅格重投影
