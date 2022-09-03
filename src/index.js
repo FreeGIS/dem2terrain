@@ -301,15 +301,18 @@ function main(input, output, options) {
     resX: dataset.geoTransform[1],
     resY: dataset.geoTransform[5],
     startX: dataset.geoTransform[0],
-    startY: dataset.geoTransform[3] + dataset.rasterSize.y * dataset.geoTransform[5],
+    startY: dataset.geoTransform[3],
     endX: dataset.geoTransform[0] + dataset.rasterSize.x * dataset.geoTransform[1],
-    endY: dataset.geoTransform[3],
+    endY: dataset.geoTransform[3] + dataset.rasterSize.y * dataset.geoTransform[5],
     path: dataset.description
   }
+  console.log(dsInfo);
   // 计算切片总数
   for (let tz = minZoom; tz <= maxZoom; ++tz) {
-    const minTileXY = coordinateSys.point2Tile(dsInfo.startX, dsInfo.startY, tz);
-    const maxTileXY = coordinateSys.point2Tile(dsInfo.endX, dsInfo.endY, tz);
+    const miny = Math.min(dsInfo.startY,dsInfo.endY);
+    const maxy = Math.max(dsInfo.startY,dsInfo.endY);
+    const minTileXY = coordinateSys.point2Tile(dsInfo.startX, miny, tz);
+    const maxTileXY = coordinateSys.point2Tile(dsInfo.endX, maxy, tz);
     const tminx = Math.max(0, minTileXY.tileX);
     const tminy = Math.max(0, minTileXY.tileY);
     let tmaxx;
@@ -347,14 +350,7 @@ function main(input, output, options) {
     let overviewInfo;
     // 根据z获取宽高和分辨率信息
     if (tz >= adjustZoom) {
-      overviewInfo = {
-        startX: dataset.geoTransform[0],
-        startY: dataset.geoTransform[3],
-        resX: dataset.geoTransform[1],
-        resY: dataset.geoTransform[5],
-        width: dataset.rasterSize.x,
-        height: dataset.rasterSize.y
-      }
+      overviewInfo = dsInfo;
     } else {
       overviewInfo = statistics.overviewInfos[tz];
     }
@@ -379,7 +375,7 @@ function main(input, output, options) {
           overviewInfo,
           rb,
           wb,
-          dsPath: dataset.description,
+          dsPath: dsInfo.path,
           x: j,
           y: ytile,
           z: tz,
