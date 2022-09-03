@@ -306,7 +306,6 @@ function main(input, output, options) {
     endY: dataset.geoTransform[3] + dataset.rasterSize.y * dataset.geoTransform[5],
     path: dataset.description
   }
-  console.log(dsInfo);
   // 计算切片总数
   for (let tz = minZoom; tz <= maxZoom; ++tz) {
     const miny = Math.min(dsInfo.startY,dsInfo.endY);
