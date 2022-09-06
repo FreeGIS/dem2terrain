@@ -383,9 +383,8 @@ async function main(input, output, options) {
           outputTile: outputDir
         };
         pileUpCount++;
-        if (pileUpCount > 500) {
+        if (pileUpCount > 500)
           await wait(1000);
-        }
         workers.createTile(createInfo, async function (err, pid) {
           if (err) {
             console.log(err);

@@ -78,5 +78,5 @@ function emptyDir(fold) {
 
 
 module.exports = {
-  uuid, prettyTime, mkdirsSync, emptyDir
+  uuid, prettyTime, mkdirsSync, emptyDir, wait
 }
