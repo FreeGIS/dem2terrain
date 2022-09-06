@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const process = require('process');
 const os = require('os');
-const { prettyTime, uuid, mkdirsSync, emptyDir } = require('./util');
+const { prettyTime, uuid, wait, mkdirsSync, emptyDir } = require('./util');
 const { reprojectImage } = require('./gdal-util');
 const { mapboxDem, terrariumDem } = require('./dem-encode');
 const CoordinateSys = require('./coordinateSys');
@@ -244,7 +244,7 @@ const buildPyramid = (
  *   encoding: 'mapbox' | 'terrarium';
  * }} options 可选配置
  */
-function main(input, output, options) {
+async function main(input, output, options) {
   // 计时开始
   const startTime = global.performance.now();
   // 结构可选参数
@@ -307,9 +307,11 @@ function main(input, output, options) {
     path: dataset.description
   }
   // 计算切片总数
+  // 堆积任务数量
+  let pileUpCount = 0;
   for (let tz = minZoom; tz <= maxZoom; ++tz) {
-    const miny = Math.min(dsInfo.startY,dsInfo.endY);
-    const maxy = Math.max(dsInfo.startY,dsInfo.endY);
+    const miny = Math.min(dsInfo.startY, dsInfo.endY);
+    const maxy = Math.max(dsInfo.startY, dsInfo.endY);
     const minTileXY = coordinateSys.point2Tile(dsInfo.startX, miny, tz);
     const maxTileXY = coordinateSys.point2Tile(dsInfo.endX, maxy, tz);
     const tminx = Math.max(0, minTileXY.tileX);
@@ -380,13 +382,17 @@ function main(input, output, options) {
           z: tz,
           outputTile: outputDir
         };
+        pileUpCount++;
+        if (pileUpCount > 500) {
+          await wait(1000);
+        }
         workers.createTile(createInfo, async function (err, pid) {
           if (err) {
             console.log(err);
           }
           childPids.add(pid);
           statistics.completeCount++;
-
+          pileUpCount--;
           // 更新进度条
           progressBar.render(statistics.completeCount);
           if (statistics.completeCount === statistics.tileCount) {
@@ -438,7 +444,6 @@ const resetStats = () => {
   statistics.encodedDsInfo = undefined;
   statistics.projectDsInfo = undefined;
 }
-
 // 重构使其支持影像金字塔查询
 /**
  * 

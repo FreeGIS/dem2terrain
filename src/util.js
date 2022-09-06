@@ -12,7 +12,9 @@ const uuid = () => {
   return (s4() + s4() + '-' + s4() + '-' + s4() + '-' + s4() + '-' + s4() + s4() + s4());
 }
 
-
+function wait(ms) {
+  return new Promise(resolve => setTimeout(() => resolve(), ms));
+};
 /**
  * 将毫秒转换为更合适显示的时间数字和单位
  * @param {number} timeInMs 
