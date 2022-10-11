@@ -159,6 +159,7 @@ map.addSource('my-custom-terrain', {
 
 当前版本足够 MapboxGL.js 使用，但仍然有新功能未开发，留待以后扩展功能，初步拟定待扩展功能如下：
 
+- 大数据量的dem tif改用分块读取分块处理
 - 扩展 gdal 驱动，使其支持 webp，直接生成 webp 格式的切片
 - 重构核心模块，解耦，扩展使其支持生成 CesiumJS 支持的地形切片格式
 

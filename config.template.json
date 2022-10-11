@@ -3,7 +3,7 @@
     "epsg": 3857,
     "size": 512,
     "encoding": "mapbox",
-    "input": "./data/pengzhou.tif",
-    "output": "./data/test",
+    "input": "./xxx.tif",
+    "output": "./xxx",
     "clean": true
 }

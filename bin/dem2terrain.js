@@ -4,6 +4,12 @@ const main = require('../index');
 const path = require('path');
 const version = require('../package.json').version;
 
+// node版本检查
+if(+process.version.substring(1,3)<16){
+  console.error(`node版本>=16，当前版本 ${process.version}`);
+  process.exit();
+}
+// { version } from 'node:process';
 program.name('dem2terrain')
   .description('使用 GDAL 制作地形瓦片，支持 mapbox 和 terrarium 两种编码输出格式，当前仅输出 PNG 容器格式。')
   .version(version, '-v, --version', '当前版本')
