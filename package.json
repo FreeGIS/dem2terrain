@@ -1,6 +1,6 @@
 {
   "name": "dem2terrain",
-  "version": "2.0.2",
+  "version": "2.1.0",
   "description": "使用 GDAL 制作 DEM 栅格的地形瓦片",
   "main": "index.js",
   "preferGlobal": true,
@@ -11,7 +11,8 @@
     "dem2terrain": "./bin/dem2terrain.js"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node ./test/app.js && dem2terrain -f ../test/config.json",
+    "server": "http-server ./test"
   },
   "repository": {
     "type": "git",
@@ -34,6 +35,7 @@
     "commander": "^9.4.0",
     "errno": "^1.0.0",
     "gdal-async": "^3.5.1",
+    "http-server": "^14.1.1",
     "single-line-log": "^1.1.2"
   }
 }

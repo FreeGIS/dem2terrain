@@ -6,16 +6,14 @@ const os = require('os');
 const { prettyTime, uuid, wait, mkdirsSync, emptyDir } = require('./util');
 const { reprojectImage } = require('./gdal-util');
 const { mapboxDem, terrariumDem } = require('./dem-encode');
-const CoordinateSys = require('./coordinateSys');
 const ProgressBar = require('./progressbar/index');
 const { mb_open, mb_stop_writing, mb_put_tile } = require('./mbtiles-util');
 // 创建一个线程池
 const workerFarm = require('./workfarm/index');
 const workers = workerFarm(require.resolve('./createtile'), ['createTile', 'closeDataset']);
-
+const { tileBoundMap, ST_TileEnvelope, getTileByCoors } = require('./tile-util');
 let childPids = new Set();
 let progressBar;
-let coordinateSys;
 /**
  * @typedef {{
  *   tminx: number;
@@ -51,7 +49,6 @@ let coordinateSys;
  * 
  * @typedef {{
  *   tileCount: number;
- *   overviewInfos: OverviewInfoDict;
  *   levelInfo: LevelInfoDict;
  *   completeCount: number;
  * }} StatisticsInfo
@@ -61,59 +58,69 @@ let coordinateSys;
 let statistics = {
   tileCount: 0,
   completeCount: 0,
-  overviewInfos: {},
   levelInfo: {}
 }
 process.on('SIGINT', function () {
   console.log('\n\n>> 清理临时文件中...');
-  if (encodedDsInfo !== null)
-    clearDsInfo(encodedDsInfo);
-  if (projectDsInfo !== null)
-    clearDsInfo(projectDsInfo);
+  recycle();
   console.log('>> 清理临时文件 - 完成');
   process.exit();
 });
-/**
- * 
- * @param {DsInfo} dsinfo 数据集的元数据信息
- */
-function clearDsInfo(dsinfo) {
-  if (dsinfo === null)
-    return;
-  // ds未关闭，强制关闭
-  dsinfo.ds.close();
+
+
+function recycle() {
+  if (sourceDs !== null) {
+    try {
+      sourceDs.close();
+    } catch (e) { }
+    sourceDs = null;
+  }
+  if (projectDs !== null) {
+    try {
+      projectDs.close();
+    } catch (e) { }
+    projectDs = null;
+  }
+  if (encodeDs !== null) {
+    try {
+      encodeDs.close();
+    } catch (e) { }
+    encodeDs = null;
+  }
   // 存在临时文件，强制删除
-  if (fs.existsSync(dsinfo.path))
-    fs.unlinkSync(dsinfo.path);
+  if (fs.existsSync(projectPath)) {
+    fs.unlinkSync(projectPath);
+    projectPath = null;
+  }
+  if (fs.existsSync(encodePath)) {
+    fs.unlinkSync(encodePath);
+    encodePath = null;
+  }
   // 存在临时影像金字塔附属文件
-  const ovrPath = dsinfo.path + '.ovr';
+  const ovrPath = encodePath + '.ovr';
   if (fs.existsSync(ovrPath))
     fs.unlinkSync(ovrPath);
-  dsinfo = null;
 }
-/**
- * 
- * @param {import('gdal').Dataset} sourceDataset gdal 直接读取的数据集 
- * @param {'mapbox' | 'terrarium'} encoding 编码格式
- * @returns {DsInfo} 编码后的数据集
- */
+// 影像编码
 const encodeDataset = (
   sourceDataset,
   encoding
 ) => {
   const sourceWidth = sourceDataset.rasterSize.x;
   const sourceHeight = sourceDataset.rasterSize.y;
-
   const bandOneHeight = sourceDataset.bands.get(1);
-  const heightBuffer = new Int16Array(sourceWidth * sourceHeight);
+  const dataType = bandOneHeight.dataType;
+  let heightBuffer;
+  if (dataType === gdal.GDT_Int16)
+    heightBuffer = new Int16Array(sourceWidth * sourceHeight);
+  else if (dataType === gdal.GDT_Float32)
+    heightBuffer = new Float32Array(sourceWidth * sourceHeight);
   // 地形是GDT_Int16 读取所有像素
-  const dataType = gdal.GDT_Int16;
   bandOneHeight.pixels.read(0, 0, sourceWidth, sourceHeight, heightBuffer, {
     buffer_width: sourceWidth,
     buffer_height: sourceHeight,
     data_type: dataType
   });
-
   // 创建编码转换的栅格文件
   const sourceDataDriver = sourceDataset.driver;
   const encodedDatasetPath = path.join(os.tmpdir(), `${uuid()}.tif`);
@@ -122,7 +129,7 @@ const encodeDataset = (
     sourceWidth,
     sourceHeight,
     3,
-    dataType
+    gdal.GDT_Byte
   );
   encodedDataset.srs = sourceDataset.srs;
   encodedDataset.geoTransform = sourceDataset.geoTransform;
@@ -154,29 +161,17 @@ const encodeDataset = (
   encodedDataset.bands.get(3).pixels.write(0, 0, sourceWidth, sourceHeight, bChannelBuffer);
   // 刷入磁盘
   encodedDataset.flush();
-  return {
-    ds: encodedDataset,
-    path: encodedDatasetPath
-  };
+  encodedDataset.close();
+  return encodedDatasetPath;
 }
 
 /**
  * 重投影数据集
- * @param {import('gdal').Dataset} encodedDataset 
- * @param {number} epsg 
- * @returns {
- *   dataset: import('gdal').Dataset
- * }
  */
-const project = (encodedDataset, epsg) => {
+const project = (ds, epsg) => {
   let projectDatasetPath = path.join(os.tmpdir(), `${uuid()}.tif`);
-  // 地形编码，非普通影像，采用最近邻采样重投影，避免出现尖尖问题
-  reprojectImage(encodedDataset, projectDatasetPath, epsg, 6);
-  let dataset = gdal.open(projectDatasetPath, 'r');
-  return {
-    ds: dataset,
-    path: projectDatasetPath
-  };
+  reprojectImage(ds, projectDatasetPath, epsg, 2);
+  return projectDatasetPath;
 }
 
 
@@ -188,50 +183,45 @@ const project = (encodedDataset, epsg) => {
  * @returns {number} adjustZoom
  */
 const buildPyramid = (
-  dataset,
+  ds,
   minZoom,
 ) => {
-  const datasetResolution = dataset.geoTransform[1]; // 使用resx替代整个影像的分辨率
-  // 根据ds_res查询出适配的最大的zoom级别
-  let adjustZoom = 1;
-  for (; adjustZoom < 20; adjustZoom++) {
-    let high = coordinateSys.getResolutionByZoom(adjustZoom);
-    let low = coordinateSys.getResolutionByZoom(adjustZoom + 1);
-    if (datasetResolution < high && datasetResolution >= low) {
+  const res = ds.geoTransform[1]; // 使用resx替代整个影像的分辨率
+  const maxPixel = Math.min(ds.rasterSize.x, ds.rasterSize.y);
+  // 金字塔分级制度，默认2的等比
+  let overviewNum = 1;
+  while (maxPixel / Math.pow(2, overviewNum) > 256) {
+    overviewNum++;
+  }
+  // 计算originZ
+  let res_zoom = (tileBoundTool.xmax - tileBoundTool.xmin) / 256;
+  let originZ = 0;
+  while (res_zoom / 2 > res) {
+    res_zoom = res_zoom / 2;
+    originZ++;
+  }
+  // 即从originZ以下，建立overviewNum个影像金字塔 <originZ| originZ-1 originZ-2 originZ-3 originZ-4 |originZ-5>
+  let overviews = [];
+  for (let zoom = originZ - 1; zoom >= originZ - 1 - overviewNum; zoom--) {
+    if (zoom < minZoom)
       break;
-    }
-  }
+    const factor = Math.pow(2, originZ - zoom)
+    overviews.push(factor);
 
-  // ds如果能塞进一个Tile（256*256），就不用再细分overviewInfo下去
-  const maxPixel = Math.max(dataset.rasterSize.x, dataset.rasterSize.y) * 1.0;
-
-  /**
-   * @type {number[]}
-   */
-  let overviews = [], factor, overviewInfo, isCalOverInfo = true;
-  for (let i = adjustZoom - 1; i >= minZoom; i--) {
-    if (isCalOverInfo) {
-      factor = Math.pow(2, adjustZoom - i);
-      overviews.push(factor);
-      // zoom级别对应overviews索引
-      overviewInfo = {
-        index: adjustZoom - i - 1,
-        startX: dataset.geoTransform[0],
-        startY: dataset.geoTransform[3],
-        width: Math.ceil(dataset.rasterSize.x * 1.0 / factor),
-        height: Math.ceil(dataset.rasterSize.y * 1.0 / factor),
-        resX: dataset.geoTransform[1] * factor,
-        resY: dataset.geoTransform[5] * factor
-      };
-    }
-    statistics.overviewInfos[i] = overviewInfo;
-    // 单个Tile是256*256的，如果raster几轮缩小，已经小于单张Tile，就不再缩小了。
-    if (isCalOverInfo === true && maxPixel / factor < 256)
-      isCalOverInfo = false;
   }
-  dataset.buildOverviews('NEAREST', overviews);
-  return adjustZoom
+  ds.buildOverviews('CUBIC', overviews);
+  // z>=originZ使用原始影像
+  return {
+    maxOverViewsZ: originZ - 1, // 大于该值用原始影像
+    minOverViewsZ: originZ - overviews.length  // 小于该值，用最后一级别影像金字塔索引
+  };
 }
+// 公共资源，包括ds，path对象
+
+let sourceDs, projectDs, encodeDs = null;
+let projectPath, encodePath = null;
+let tileBoundTool;
+
 /**
  * 
  * @param {string} tifFilePath TIF 文件路径
@@ -250,6 +240,7 @@ async function main(input, output, options) {
   // 结构可选参数
   // 结构可选参数
   const { minZoom, maxZoom, epsg, tileSize, encoding, isClean } = options;
+  tileBoundTool = tileBoundMap.get(epsg);
   // 判断是否以mbtiles转储
   const isSavaMbtiles = (path.extname(output) === '.mbtiles');
   // 定义切片临时输出目录
@@ -269,67 +260,68 @@ async function main(input, output, options) {
   }
 
   //#endregion
-  coordinateSys = new CoordinateSys(epsg);
-  const sourceDataset = gdal.open(input, 'r');
-  //#region 步骤 1 - 高程值转 RGB，重新编码
-  encodedDsInfo = encodeDataset(sourceDataset, encoding);
-  sourceDataset.close();
+  console.log(__dirname);
+  sourceDs = gdal.open(input, 'r');
+  //#region 步骤 1 - 重投影
+
+  if (sourceDs.srs.getAuthorityCode() !== epsg) {
+    projectPath = project(sourceDs, epsg);
+    projectDs = gdal.open(projectPath, 'r');
+    sourceDs.close(); // 原始的就不需要了
+  } else {
+    projectDs = sourceDs;
+  }
+  sourceDs = null;
+  console.log(`>> 步骤${++stepIndex}: 重投影至 EPSG:${epsg} - 完成`);
+  //#region 步骤 2 - 高程值转 RGB，重新编码
+  encodePath = encodeDataset(projectDs, encoding);
+  projectDs.close();// 重投影的就不需要了
+  projectDs = null;
   console.log(`>> 步骤${++stepIndex}: 重编码 - 完成`);
   //#endregion
-  //#region 步骤 2 - 影像重投影
-  let dataset;
-  let encodeDs = encodedDsInfo.ds;
-  if (encodeDs.srs.getAuthorityCode() !== epsg) {
-    projectDsInfo = project(encodeDs, epsg);
-    dataset = projectDsInfo.ds;
-  } else {
-    dataset = encodeDs;
-  }
-  console.log(`>> 步骤${++stepIndex}: 重投影至 EPSG:${epsg} - 完成`);
-  //#endregion
-
 
   //#region 步骤 3 - 建立影像金字塔 由于地形通常是30m 90m精度
-  const adjustZoom = buildPyramid(dataset, minZoom);
+  encodeDs = gdal.open(encodePath, 'r');
+  const overViewInfo = buildPyramid(encodeDs, minZoom);
   console.log(`>> 步骤${++stepIndex}: 构建影像金字塔索引 - 完成`);
   //#endregion
 
   //#region 步骤4 - 切片
   const dsInfo = {
-    width: dataset.rasterSize.x,
-    height: dataset.rasterSize.y,
-    resX: dataset.geoTransform[1],
-    resY: dataset.geoTransform[5],
-    startX: dataset.geoTransform[0],
-    startY: dataset.geoTransform[3],
-    endX: dataset.geoTransform[0] + dataset.rasterSize.x * dataset.geoTransform[1],
-    endY: dataset.geoTransform[3] + dataset.rasterSize.y * dataset.geoTransform[5],
-    path: dataset.description
+    width: encodeDs.rasterSize.x,
+    height: encodeDs.rasterSize.y,
+    resX: encodeDs.geoTransform[1],
+    resY: encodeDs.geoTransform[5],
+    startX: encodeDs.geoTransform[0],
+    startY: encodeDs.geoTransform[3],
+    endX: encodeDs.geoTransform[0] + encodeDs.rasterSize.x * encodeDs.geoTransform[1],
+    endY: encodeDs.geoTransform[3] + encodeDs.rasterSize.y * encodeDs.geoTransform[5],
+    path: encodeDs.description
   }
+
   // 计算切片总数
   // 堆积任务数量
   let pileUpCount = 0;
+  let miny, maxy;
+  if (dsInfo.startY < dsInfo.endY) {
+    miny = dsInfo.startY;
+    maxy = dsInfo.endY;
+  } else {
+    miny = dsInfo.endY;
+    maxy = dsInfo.startY;
+  }
+  // xyz是从左上角开始，往右下角走
+  let startPoint = [dsInfo.startX, maxy];
+  let endPoint = [dsInfo.endX, miny];
   for (let tz = minZoom; tz <= maxZoom; ++tz) {
-    const miny = Math.min(dsInfo.startY, dsInfo.endY);
-    const maxy = Math.max(dsInfo.startY, dsInfo.endY);
-    const minTileXY = coordinateSys.point2Tile(dsInfo.startX, miny, tz);
-    const maxTileXY = coordinateSys.point2Tile(dsInfo.endX, maxy, tz);
-    const tminx = Math.max(0, minTileXY.tileX);
-    const tminy = Math.max(0, minTileXY.tileY);
-    let tmaxx;
-    if (epsg === 3857) {
-      tmaxx = Math.min(Math.pow(2, tz) - 1, maxTileXY.tileX);
-      tmaxy = Math.min(Math.pow(2, tz) - 1, maxTileXY.tileY);
-    } else {
-      tmaxx = Math.min(Math.pow(2, tz + 1) - 1, maxTileXY.tileX);
-      tmaxy = Math.min(Math.pow(2, tz + 1) - 1, maxTileXY.tileY);
-    }
-    statistics.tileCount += (tmaxy - tminy + 1) * (tmaxx - tminx + 1);
+    const minRC = getTileByCoors(startPoint, tz, tileBoundTool);
+    const maxRC = getTileByCoors(endPoint, tz, tileBoundTool);
+    statistics.tileCount += (maxRC.row - minRC.row + 1) * (maxRC.column - minRC.column + 1);
     statistics.levelInfo[tz] = {
-      tminx,
-      tminy,
-      tmaxx,
-      tmaxy
+      tminx: minRC.column,
+      tminy: minRC.row,
+      tmaxx: maxRC.column,
+      tmaxy: maxRC.row,
     };
   }
   // 设置进度条任务总数
@@ -345,30 +337,36 @@ async function main(input, output, options) {
   }
   for (let tz = minZoom; tz <= maxZoom; tz++) {
     const { tminx, tminy, tmaxx, tmaxy } = statistics.levelInfo[tz];
-    /**
-     * @type {OverviewInfo}
-     */
     let overviewInfo;
     // 根据z获取宽高和分辨率信息
-    if (tz >= adjustZoom) {
+    if (tz > overViewInfo.maxOverViewsZ)
       overviewInfo = dsInfo;
-    } else {
-      overviewInfo = statistics.overviewInfos[tz];
+    else {
+      let startZ = Math.max(tz, overViewInfo.minOverViewsZ);
+      const factorZoom = overViewInfo.maxOverViewsZ - startZ;
+      const factor = Math.pow(2, factorZoom+1);
+      overviewInfo = {
+        index: factorZoom, //影像金字塔序号从0开始
+        startX: dsInfo.startX,
+        startY: dsInfo.startY,
+        width: Math.ceil(dsInfo.width * 1.0 / factor),
+        height: Math.ceil(dsInfo.height * 1.0 / factor),
+        resX: dsInfo.resX * factor,
+        resY: dsInfo.resY * factor
+      };
     }
     for (let j = tminx; j <= tmaxx; j++) {
       // 递归创建目录
       mkdirsSync(path.join(outputDir, tz.toString(), j.toString()));
       for (let i = tminy; i <= tmaxy; i++) {
-        // mapbox地形只认 xyz，不认tms，故直接写死
-        const ytile = getYtile(i, tz, true);
         // 由于裙边让周围多了1像素，由于切片是把xyz的地理范围数据编码到512上，所以256这里就是1，512这里就是0.5
-        const tileBound = coordinateSys.tileBounds(j, i, tz, offset);
+        const tileBound = ST_TileEnvelope(tz, j, i, offset, tileBoundTool);
         const { rb, wb } = geoQuery(
           overviewInfo,
-          tileBound.xMin,
-          tileBound.yMax,
-          tileBound.xMax,
-          tileBound.yMin,
+          tileBound[0],
+          tileBound[3],
+          tileBound[2],
+          tileBound[1],
           outTileSize
         );
         const createInfo = {
@@ -378,7 +376,7 @@ async function main(input, output, options) {
           wb,
           dsPath: dsInfo.path,
           x: j,
-          y: ytile,
+          y: i,
           z: tz,
           outputTile: outputDir
         };
@@ -415,8 +413,7 @@ async function main(input, output, options) {
                   // 关闭子进程任务
                   workerFarm.end(workers);
                   // 清除数据源信息
-                  clearDsInfo(encodedDsInfo);
-                  clearDsInfo(projectDsInfo);
+                  recycle();
                   resetStats();
                 }
               },
@@ -439,9 +436,6 @@ const resetStats = () => {
   statistics.tileCount = 0;
   statistics.completeCount = 0;
   statistics.levelInfo = {};
-  statistics.overviewInfos = {};
-  statistics.encodedDsInfo = undefined;
-  statistics.projectDsInfo = undefined;
 }
 // 重构使其支持影像金字塔查询
 /**

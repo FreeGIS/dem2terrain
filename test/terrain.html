@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title>3D Terrain</title>
+  <meta property="og:description" content="Go beyond hillshade and show elevation in actual 3D." />
+  <meta charset='utf-8'>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel='stylesheet' href='./maplibre/maplibre-gl.css' />
+  <script src='./maplibre/maplibre-gl.js'></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body,
+    #map {
+      height: 100%;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="map"></div>
+  <script>
+    const map = (window.map = new maplibregl.Map({
+      container: 'map',
+      zoom: 9,
+      center: [113.5, 33.5],
+      style: {
+        version: 8,
+        sources: {
+          terrainSource: {
+            type: 'raster-dem',
+            encoding: 'mapbox',
+            'tiles': ['./terrain/{z}/{x}/{y}.png'],
+            tileSize: 256
+          }
+        },
+        layers: [
+          {
+            id: 'hills',
+            type: 'hillshade',
+            source: 'terrainSource',
+            layout: { visibility: 'visible' },
+            paint: { 'hillshade-shadow-color': '#473B24' }
+          }
+        ],
+        terrain: {
+          source: 'terrainSource',
+          exaggeration: 1.5
+        }
+      },
+      maxZoom: 18,
+      maxPitch: 85
+    }));
+
+    map.addControl(
+      new maplibregl.NavigationControl({
+        visualizePitch: true,
+        showZoom: true,
+        showCompass: true
+      })
+    );
+
+    map.addControl(
+      new maplibregl.TerrainControl({
+        source: 'terrainSource',
+        exaggeration: 1
+      })
+    );
+  </script>
+</body>
+
+</html>

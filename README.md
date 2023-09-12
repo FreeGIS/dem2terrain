@@ -48,6 +48,24 @@ pnpm install && pnpm link --global
 
 安装完毕后就可以当普通命令行程序使用了。
 
+## 1.3. 测试
+测试地形数据生产：
+```bash
+npm run test
+
+```
+基于maplibregl地形预览：
+
+```bash
+npm run server
+
+```
+浏览器输入地址进行预览：http://[ip]:[port]/terrain.html
+
+效果图如下：
+
+![地形测试可视化](./doc/terrain-test.png)
+
 # 2. 用法与说明
 
 当前支持作为命令行使用：
