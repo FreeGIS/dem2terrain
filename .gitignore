@@ -107,4 +107,5 @@ dist
 
 # TernJS port file
 .tern-port
-data
+terrain
+config.json
