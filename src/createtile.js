@@ -1,6 +1,10 @@
 const gdal = require('gdal-async');
 const { getDriverByName } = require('./gdal-util');
 const path = require('path');
+const fs = require('fs');
+const { createCanvas, Image } = require('@napi-rs/canvas');
+const canvas = createCanvas(1, 1);
+
 function writeTerrainTile(overviewInfo, readinfo, writeinfo, bandnums) {
     bandnums.forEach(i => {
         let readband;
@@ -43,6 +47,7 @@ function createTile(createInfo, callback) {
     msmDS.flush();
     msmDS.close();
     pngDs.close();
+    transparentTile(pngPath, outTileSize);
     callback(null, process.pid);
 }
 function closeDataset(callback) {
@@ -53,5 +58,49 @@ function closeDataset(callback) {
     }
     callback(null, null);
 
+}
+
+//需要忽略的颜色值
+const ignoreColors = [
+    [0, 0, 0]
+];
+
+function isIgnoreColor(r, g, b) {
+    for (let i = 0, len = ignoreColors.length; i < len; i++) {
+        const color = ignoreColors[i];
+        const [cr, cg, cb] = color;
+        if (cr === r && cg === g && cb === b) {
+            return true;
+        }
+    }
+    return false;
+}
+
+//透明瓦片
+function transparentTile(tilePath, outTileSize) {
+    if (!fs.existsSync(tilePath)) {
+        return;
+    }
+    const width = outTileSize, height = outTileSize;
+    const buffer = fs.readFileSync(tilePath);
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, width, height);
+    const img = new Image();
+    img.src = buffer;
+    ctx.drawImage(img, 0, 0);
+    const imageData = ctx.getImageData(0, 0, width, height);
+    for (let i = 0, len = imageData.data.length; i < len; i += 4) {
+        const r = imageData.data[i];
+        const g = imageData.data[i + 1];
+        const b = imageData.data[i + 2];
+        if (isIgnoreColor(r, g, b)) {
+            imageData.data[i + 3] = 0;
+        }
+    }
+    ctx.putImageData(imageData, 0, 0);
+    const newBuffer = canvas.toBuffer('image/png');
+    fs.writeFileSync(tilePath, newBuffer);
 }
 module.exports = { createTile, closeDataset }
