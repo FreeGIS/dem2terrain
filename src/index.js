@@ -260,7 +260,6 @@ async function main(input, output, options) {
   }
 
   //#endregion
-  console.log(__dirname);
   sourceDs = gdal.open(input, 'r');
   //#region 步骤 1 - 重投影
 
