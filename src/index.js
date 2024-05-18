@@ -328,11 +328,10 @@ async function main(input, output, options) {
   progressBar.setTaskTotal(statistics.tileCount)
   // 实际裙边有1像素 256+1+1 上下左右各1像素
   // 裙边所需的缩放
-  let offset = 0
+  let buffer = 1;
   let outTileSize = tileSize;
   if (encoding === 'mapbox') {
-    offset = 256.0 / tileSize;
-    outTileSize = tileSize + 2;
+    outTileSize = tileSize + buffer*2;
   }
   for (let tz = minZoom; tz <= maxZoom; tz++) {
     const { tminx, tminy, tmaxx, tmaxy } = statistics.levelInfo[tz];
@@ -358,8 +357,7 @@ async function main(input, output, options) {
       // 递归创建目录
       mkdirsSync(path.join(outputDir, tz.toString(), j.toString()));
       for (let i = tminy; i <= tmaxy; i++) {
-        // 由于裙边让周围多了1像素，由于切片是把xyz的地理范围数据编码到512上，所以256这里就是1，512这里就是0.5
-        const tileBound = ST_TileEnvelope(tz, j, i, offset, tileBoundTool);
+        const tileBound = ST_TileEnvelope(tz, j, i, buffer, tileBoundTool);
         const { rb, wb } = geoQuery(
           overviewInfo,
           tileBound[0],
