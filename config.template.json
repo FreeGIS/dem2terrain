@@ -1,7 +1,6 @@
 {
     "zoom":"5-14",
     "epsg": 3857,
-    "size": 512,
     "encoding": "mapbox",
     "input": "./xxx.tif",
     "output": "./xxx",

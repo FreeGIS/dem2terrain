@@ -22,7 +22,6 @@ program
   .option('-f, --configFile <File>', '<可选> 通过配置文件执行任务，输入绝对路径，可参考配置模板')
   .option('-g, --epsg <number>', '<可选> Tile适用坐标系，3857 | 4490 | 4326', 3857)
   .option('-c, --clean <number>', '<可选> 是否清空输出目录，0 | 1', 0)
-  .option('-s, --size <number>', '<可选> 指定生成瓦片的尺寸,256 | 512', 512)
   .option('-z, --zoom <number-number>', '<可选> 指定瓦片的等级生成范围。例如，想生成 7 ~ 12 级的瓦片，则输入 -z 7-12', '5-14')
   .option('-e, --encoding <string>', '<可选> 指定瓦片的数据编码规则（mapbox 或 terrarium）', 'mapbox');
 
@@ -42,7 +41,7 @@ if(inputDem===undefined||outputDir===undefined){
   console.log('参数缺失: 输入文件路径或输出目录必填');
   process.exit();
 }
-const tileSize = Number(params['size']);
+
 const encoding = params['encoding'];
 const epsg = Number(params['epsg']);
 const isClean = Number(params['clean']);
@@ -68,7 +67,7 @@ const logMsg = `\n>> 开始转换...
 - 输出路径: ${outFileAbsolutePath}
 - Tile适用坐标系: EPSG:${epsg}
 - 瓦片编码: ${encoding === 'mapbox' ? 'mapbox(raster-dem)' : encoding}
-- 瓦片尺寸: ${tileSize} px
+- 瓦片尺寸: 256 px
 - 瓦片等级: ${minZoom} 至 ${maxZoom} 级
 `;
 console.log(logMsg);
@@ -77,7 +76,6 @@ main(inputDem, outputDir, {
   minZoom,
   maxZoom,
   epsg,
-  tileSize,
   encoding,
   isClean
 });

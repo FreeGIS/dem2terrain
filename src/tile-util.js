@@ -26,6 +26,7 @@ tileBoundMap.set(4326, {
 });
 // 根据xyz计算对应地理坐标系的地理边界
 function ST_TileEnvelope(z, x, y, offset = 0, bbox = tileBoundMap.get(3857)) {
+    const tile_size = 256.0;
     const boundsWidth = bbox.xmax - bbox.xmin;
     const boundsHeight = bbox.ymax - bbox.ymin;
     if (boundsWidth <= 0 || boundsHeight <= 0)
@@ -43,11 +44,11 @@ function ST_TileEnvelope(z, x, y, offset = 0, bbox = tileBoundMap.get(3857)) {
     const tileGeoSizeX = boundsWidth * 1.0 / worldTileSize;
     const tileGeoSizeY = boundsHeight * 1.0 / worldTileSize;
 
-    let x1 = bbox.xmin + tileGeoSizeX * x - tileGeoSizeX / 256.0 * offset;
-    let x2 = bbox.xmin + tileGeoSizeX * (x + 1) + tileGeoSizeX / 256.0 * offset;
+    let x1 = bbox.xmin + tileGeoSizeX * x - tileGeoSizeX / tile_size * offset;
+    let x2 = bbox.xmin + tileGeoSizeX * (x + 1) + tileGeoSizeX / tile_size * offset;
 
-    let y1 = bbox.ymax - tileGeoSizeY * (y + 1) - tileGeoSizeY / 256.0 * offset;
-    let y2 = bbox.ymax - tileGeoSizeY * (y) + tileGeoSizeY / 256.0 * offset;
+    let y1 = bbox.ymax - tileGeoSizeY * (y + 1) - tileGeoSizeY / tile_size * offset;
+    let y2 = bbox.ymax - tileGeoSizeY * (y) + tileGeoSizeY / tile_size * offset;
 
     return [x1, y1, x2, y2];
 

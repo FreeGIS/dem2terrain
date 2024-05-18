@@ -5,7 +5,7 @@
 特点：
 
 - 支持 `mapbox` 和 `terrarium` 两种地形瓦片编码格式供mapboxgl使用，其中terrarium格式是[tangram](https://www.mapzen.com/products/tangram/)引擎的官方地形格式，tangram是另外一款开源的webgl二三维一体化的引擎；
-- 支持自定义瓦片级别和瓦片尺寸设置，瓦片周围会有 1px 的裙边。例如指定生成 512px 的瓦片，实际输出的瓦片文件分辨率为 `514 × 514`，与 Mapbox 官方一致；
+- 固定瓦片尺寸256，瓦片周围有1cell的buffer，即实际瓦片是258*258.
 - 自动读取数据源的坐标系统，重编码输入的 DEM 栅格文件，并重投影至指定的坐标系4490、4326、3857，默认3857，然后生成瓦片；
 - 支持适用于3857、4490、4326的地形切片生产；
 - 内置了影像金字塔索引和多进程实现（暂未使用多线程），加速瓦片生成速度；
@@ -83,7 +83,6 @@ Options:
   -f, --configFile <File>     <可选> 通过配置文件执行任务，输入绝对路径，可参考配置模板
   -g, --epsg <number>         <可选> Tile适用坐标系，3857 | 4490 | 4326 (default: 3857)
   -c, --clean <number>        <可选> 是否清空输出目录，0 | 1 (default: 0)
-  -s, --size <number>         <可选> 指定生成瓦片的尺寸,256 | 512 (default: 512)
   -z, --zoom <number-number>  <可选> 指定瓦片的等级生成范围。例如，想生成 7 ~ 12 级的瓦片，则输入 -z 7-12 (default: "5-14")
   -e, --encoding <string>     <可选> 指定瓦片的数据编码规则（mapbox 或 terrarium） (default: "mapbox")
   -h, --help                  帮助
@@ -94,7 +93,6 @@ Options:
 - `-o`: 输出目录，支持相对路径；
 - `-g`: 指定地形Tile适用坐标系，默认是适用3857坐标系；
 - `-z`: 由于地形栅格数据通常是 90m、30m 的空间分辨率，等级太大意义不大，等级太低时起伏辨识也不高，所以默认生成中间的 `5-14` 级；
-- `-s`: 指定输出瓦片的尺寸，默认是 512 像素；
 - `-c`: 指定是否预先清理输出瓦片的存储目录，默认0，不清理；
 - `-e`: 指定切片编码规则，默认 mapbox，用户可指定 terrarium 规则输出。
 - `-f`: 以上参数可以都放到一个配置json文件里，使用-f执行切片任务，简化操作；
@@ -105,7 +103,7 @@ Options:
 
 * 方式1：通过命令行参数执行任务
 ```bash
-dem2terrain -z 4-15 -s 256 -e terrarium -i ./ZONE.tiff -o ./output -c 1 -g 3857
+dem2terrain -z 4-15 -e terrarium -i ./ZONE.tiff -o ./output -c 1 -g 3857
 ```
 
 * 方式2：通过配置文件执行任务
@@ -115,7 +113,6 @@ dem2terrain -z 4-15 -s 256 -e terrarium -i ./ZONE.tiff -o ./output -c 1 -g 3857
 {
     "zoom":"5-13",
     "epsg": 3857,
-    "size": 512,
     "encoding": "mapbox",
     "input": "./data/xxx.tif",
     "output": "./data/tile",
@@ -134,14 +131,14 @@ dem2terrain -f d://config.json
 
 -o参数为文件目录，则以文件形式存储：
 ```bash
-dem2terrain -z 4-15 -s 256 -e terrarium -i ./ZONE.tiff -o ./output -c 1 -g 3857
+dem2terrain -z 4-15 -e terrarium -i ./ZONE.tiff -o ./output -c 1 -g 3857
 ```
 
 * 以mbtiles存储
 
 -o参数带.mbtiles扩展名，则以mbtiles形式存储：
 ```bash
-dem2terrain -z 4-15 -s 256 -e terrarium -i ./ZONE.tiff -o ./output/tile.mbtiles -c 1 -g 3857
+dem2terrain -z 4-15 -e terrarium -i ./ZONE.tiff -o ./output/tile.mbtiles -c 1 -g 3857
 ```
 
 
@@ -155,7 +152,6 @@ dem2terrain -z 4-15 -s 256 -e terrarium -i ./ZONE.tiff -o ./output/tile.mbtiles 
 ```javascript
 // 数据编码，'mapbox'或'terrarium'
 const encoding = 'mapbox';
-const tileSize = 512;
 const maxZoom = 14;
 map.addSource('my-custom-terrain', {
   type: 'raster-dem',
@@ -164,7 +160,7 @@ map.addSource('my-custom-terrain', {
   tiles: ['./mapbox/{z}/{x}/{y}.png'],
   // 注释掉官方的服务url，替换自己的
 	//'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
-  tileSize: tileSize,
+  tileSize: 256,
   maxzoom: maxZoom,
 })
 ```

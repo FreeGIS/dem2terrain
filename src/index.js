@@ -230,7 +230,6 @@ let tileBoundTool;
  *   minZoom: number;
  *   maxZoom: number;
  *   epsg: number;
- *   tileSize: 256 | 512;
  *   encoding: 'mapbox' | 'terrarium';
  * }} options 可选配置
  */
@@ -238,8 +237,9 @@ async function main(input, output, options) {
   // 计时开始
   const startTime = global.performance.now();
   // 结构可选参数
-  // 结构可选参数
-  const { minZoom, maxZoom, epsg, tileSize, encoding, isClean } = options;
+  const { minZoom, maxZoom, epsg, encoding, isClean } = options;
+  // 固定瓦片尺寸
+  const tileSize = 256;
   tileBoundTool = tileBoundMap.get(epsg);
   // 判断是否以mbtiles转储
   const isSavaMbtiles = (path.extname(output) === '.mbtiles');
