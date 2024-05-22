@@ -5,7 +5,6 @@ const process = require('process');
 const os = require('os');
 const { prettyTime, uuid, wait, mkdirsSync, emptyDir } = require('./util');
 const { reprojectImage } = require('./gdal-util');
-const { mapboxDem, terrariumDem } = require('./dem-encode');
 const ProgressBar = require('./progressbar/index');
 const { mb_open, mb_stop_writing, mb_put_tile } = require('./mbtiles-util');
 // 创建一个线程池
@@ -81,12 +80,12 @@ function recycle() {
     } catch (e) { }
     projectDs = null;
   }
-  if (encodeDs !== null) {
+  /*if (encodeDs !== null) {
     try {
       encodeDs.close();
     } catch (e) { }
     encodeDs = null;
-  }
+  }*/
   // 存在临时文件，强制删除
   if (fs.existsSync(projectPath)) {
     fs.unlinkSync(projectPath);
@@ -101,69 +100,7 @@ function recycle() {
   if (fs.existsSync(ovrPath))
     fs.unlinkSync(ovrPath);
 }
-// 影像编码
-const encodeDataset = (
-  sourceDataset,
-  encoding
-) => {
-  const sourceWidth = sourceDataset.rasterSize.x;
-  const sourceHeight = sourceDataset.rasterSize.y;
-  const bandOneHeight = sourceDataset.bands.get(1);
-  const dataType = bandOneHeight.dataType;
-  let heightBuffer;
-  if (dataType === gdal.GDT_Int16)
-    heightBuffer = new Int16Array(sourceWidth * sourceHeight);
-  else if (dataType === gdal.GDT_Float32)
-    heightBuffer = new Float32Array(sourceWidth * sourceHeight);
-  // 地形是GDT_Int16 读取所有像素
-  bandOneHeight.pixels.read(0, 0, sourceWidth, sourceHeight, heightBuffer, {
-    buffer_width: sourceWidth,
-    buffer_height: sourceHeight,
-    data_type: dataType
-  });
-  // 创建编码转换的栅格文件
-  const sourceDataDriver = sourceDataset.driver;
-  const encodedDatasetPath = path.join(os.tmpdir(), `${uuid()}.tif`);
-  const encodedDataset = sourceDataDriver.create(
-    encodedDatasetPath,
-    sourceWidth,
-    sourceHeight,
-    3,
-    gdal.GDT_Byte
-  );
-  encodedDataset.srs = sourceDataset.srs;
-  encodedDataset.geoTransform = sourceDataset.geoTransform;
-  const channelLength = sourceWidth * sourceHeight;
-  const rChannelBuffer = new Uint8Array(channelLength);
-  const gChannelBuffer = new Uint8Array(channelLength);
-  const bChannelBuffer = new Uint8Array(channelLength);
-  function forEachHeightBuffer(heightBuffer, encode) {
-    const TEMPCOLOR = [1, 1, 1];
-    for (let i = 0, len = heightBuffer.length; i < len; i++) {
-      if (encode) {
-        const color = encode(heightBuffer[i], TEMPCOLOR);
-        rChannelBuffer[i] = color[0];
-        gChannelBuffer[i] = color[1];
-        bChannelBuffer[i] = color[2];
-      }
-    }
-  }
-  // 循环高程，转rgb编码
-  if (encoding === 'mapbox') {
-    forEachHeightBuffer(heightBuffer, mapboxDem.encode);
-  } else if (encoding === 'terrarium') {
-    forEachHeightBuffer(heightBuffer, terrariumDem.encode);
-  }
 
-  // 写入像素值
-  encodedDataset.bands.get(1).pixels.write(0, 0, sourceWidth, sourceHeight, rChannelBuffer);
-  encodedDataset.bands.get(2).pixels.write(0, 0, sourceWidth, sourceHeight, gChannelBuffer);
-  encodedDataset.bands.get(3).pixels.write(0, 0, sourceWidth, sourceHeight, bChannelBuffer);
-  // 刷入磁盘
-  encodedDataset.flush();
-  encodedDataset.close();
-  return encodedDatasetPath;
-}
 
 /**
  * 重投影数据集
@@ -218,7 +155,8 @@ const buildPyramid = (
 }
 // 公共资源，包括ds，path对象
 
-let sourceDs, projectDs, encodeDs = null;
+let sourceDs, projectDs = null;
+// , encodeDs
 let projectPath, encodePath = null;
 let tileBoundTool;
 
@@ -273,29 +211,30 @@ async function main(input, output, options) {
   sourceDs = null;
   console.log(`>> 步骤${++stepIndex}: 重投影至 EPSG:${epsg} - 完成`);
   //#region 步骤 2 - 高程值转 RGB，重新编码
-  encodePath = encodeDataset(projectDs, encoding);
-  projectDs.close();// 重投影的就不需要了
-  projectDs = null;
-  console.log(`>> 步骤${++stepIndex}: 重编码 - 完成`);
+  //encodePath = encodeDataset(projectDs, encoding);
+  //projectDs.close();// 重投影的就不需要了
+  //projectDs = null;
+  //console.log(`>> 步骤${++stepIndex}: 重编码 - 完成`);
   //#endregion
 
   //#region 步骤 3 - 建立影像金字塔 由于地形通常是30m 90m精度
-  encodeDs = gdal.open(encodePath, 'r');
-  const overViewInfo = buildPyramid(encodeDs, minZoom);
+  //encodeDs = gdal.open(encodePath, 'r');
+
+  const overViewInfo = buildPyramid(projectDs, minZoom);
   console.log(`>> 步骤${++stepIndex}: 构建影像金字塔索引 - 完成`);
   //#endregion
 
   //#region 步骤4 - 切片
   const dsInfo = {
-    width: encodeDs.rasterSize.x,
-    height: encodeDs.rasterSize.y,
-    resX: encodeDs.geoTransform[1],
-    resY: encodeDs.geoTransform[5],
-    startX: encodeDs.geoTransform[0],
-    startY: encodeDs.geoTransform[3],
-    endX: encodeDs.geoTransform[0] + encodeDs.rasterSize.x * encodeDs.geoTransform[1],
-    endY: encodeDs.geoTransform[3] + encodeDs.rasterSize.y * encodeDs.geoTransform[5],
-    path: encodeDs.description
+    width: projectDs.rasterSize.x,
+    height: projectDs.rasterSize.y,
+    resX: projectDs.geoTransform[1],
+    resY: projectDs.geoTransform[5],
+    startX: projectDs.geoTransform[0],
+    startY: projectDs.geoTransform[3],
+    endX: projectDs.geoTransform[0] + projectDs.rasterSize.x * projectDs.geoTransform[1],
+    endY: projectDs.geoTransform[3] + projectDs.rasterSize.y * projectDs.geoTransform[5],
+    path: projectDs.description
   }
 
   // 计算切片总数
@@ -371,6 +310,7 @@ async function main(input, output, options) {
           overviewInfo,
           rb,
           wb,
+          encoding,
           dsPath: dsInfo.path,
           x: j,
           y: i,

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Query terrain elevation</title>
+  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+  </style>
+</head>
+
+<body>
+  <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+  <div id="map"></div>
+  <script>
+    // 注意，请写自己的token运行
+    mapboxgl.accessToken = '';
+
+    const map = new mapboxgl.Map({
+      container: 'map',
+      zoom: 8,
+      center: [107.6, 33.98],
+      pitch: 76,
+      bearing: 150,
+      // Choose from Mapbox's core styles, or make your own style with Mapbox Studio
+      style: 'mapbox://styles/mapbox/satellite-streets-v12',
+      hash: false
+    });
+
+    map.on('load', (e)=>{
+      // Set custom fog
+      map.setFog({
+        'range': [-0.5, 2],
+        'color': '#def',
+        'high-color': '#def',
+        'space-color': '#def'
+      });
+
+      // Add terrain source, with slight exaggeration
+      map.addSource('mapbox-dem', {
+        'type': 'raster-dem',
+        'tiles': ['./terrain/{z}/{x}/{y}.png'],
+        tileSize: 256,
+        'maxzoom': 14
+      });
+      map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
+    })
+
+
+
+  </script>
+
+</body>
+
+</html>

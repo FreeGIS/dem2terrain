@@ -25,7 +25,7 @@ function getDriverByName(driverName) {
  *
  * @author freegis
  */
-function reprojectImage(src_ds, reproject_path, t_epsg, resampling = 0) {
+function reprojectImage(src_ds, reproject_path, t_epsg, resampling = 1) {
   let s_ds;
   if (typeof (src_ds) === 'string')
     s_ds = gdal.open(src_ds);

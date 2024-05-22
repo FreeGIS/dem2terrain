@@ -81,5 +81,6 @@ const cesiumDem = {
     extension: 'terrain'
 }
 module.exports = {
-    mapboxDem, terrariumDem, cesiumDem
+    //mapboxDem, terrariumDem, cesiumDem
+    mapboxEncode, terrariumEncode
 }

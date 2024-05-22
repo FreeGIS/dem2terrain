@@ -1,6 +1,6 @@
 {
   "name": "dem2terrain",
-  "version": "2.1.2",
+  "version": "2.2",
   "description": "使用 GDAL 制作 DEM 栅格的地形瓦片",
   "main": "index.js",
   "preferGlobal": true,

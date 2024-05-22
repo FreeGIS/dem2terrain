@@ -1,13 +1,13 @@
 const path = require('path');
 const fs = require('fs');
 
-const demPath = path.join(__dirname, 'dem.tif');
+const demPath = path.join(__dirname, '12m.tif');
 const tileDirPath = path.join(__dirname, 'terrain');
 
 const config = {
     "zoom": "5-13",
     "epsg": 3857,
-    "size": 512,
+    "size": 256,
     "encoding": "mapbox",
     "input": demPath,
     "output": tileDirPath,
