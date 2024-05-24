@@ -82,6 +82,7 @@ Options:
   -o, --output <string>       <必填> 输出目录，支持相对路径
   -f, --configFile <File>     <可选> 通过配置文件执行任务，输入绝对路径，可参考配置模板
   -g, --epsg <number>         <可选> Tile适用坐标系，3857 | 4490 | 4326 (default: 3857)
+  -r, --resampling <number>,  <可选> 构建影像金字塔或重投影时设置重采样策略，默认3，1:AVERAGE|2:BILINEAR|3:CUBIC|4:CUBICSPLINE|5:LANCZOS|6:MODE|7:NEAREST
   -c, --clean <number>        <可选> 是否清空输出目录，0 | 1 (default: 0)
   -z, --zoom <number-number>  <可选> 指定瓦片的等级生成范围。例如，想生成 7 ~ 12 级的瓦片，则输入 -z 7-12 (default: "5-14")
   -e, --encoding <string>     <可选> 指定瓦片的数据编码规则（mapbox 或 terrarium） (default: "mapbox")
@@ -92,6 +93,7 @@ Options:
 - `-i`: 输入 tif 格式的 DEM 文件路径，支持相对路径；
 - `-o`: 输出目录，支持相对路径；
 - `-g`: 指定地形Tile适用坐标系，默认是适用3857坐标系；
+- `-r`:  构建影像金字塔或重投影时设置重采样策略，默认3 CUBIC 采样；
 - `-z`: 由于地形栅格数据通常是 90m、30m 的空间分辨率，等级太大意义不大，等级太低时起伏辨识也不高，所以默认生成中间的 `5-14` 级；
 - `-c`: 指定是否预先清理输出瓦片的存储目录，默认0，不清理；
 - `-e`: 指定切片编码规则，默认 mapbox，用户可指定 terrarium 规则输出。
