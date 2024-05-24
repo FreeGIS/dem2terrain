@@ -8,6 +8,7 @@ const config = {
     "zoom": "5-13",
     "epsg": 3857,
     "size": 256,
+    "resampling": 3,
     "encoding": "mapbox",
     "input": demPath,
     "output": tileDirPath,

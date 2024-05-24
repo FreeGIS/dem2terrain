@@ -1,4 +1,47 @@
 const gdal = require('gdal-async');
+// 根据策略获取对应的采样方法
+function getBuildOverviewResampling(resampling) {
+  switch (resampling) {
+    case 1:
+      return "AVERAGE";
+    case 2:
+      return "BILINEAR";
+    case 3:
+      return "CUBIC";
+    case 4:
+      return "CUBICSPLINE";
+    case 5:
+      return "LANCZOS";
+    case 6:
+      return "MODE";
+    case 7:
+      return "NEAREST";
+    default:
+      return "CUBIC";
+  }
+}
+
+function getResampling(resampling) {
+  switch (resampling) {
+    case 1:
+      return gdal_resampling = gdal.GRA_Average;
+    case 2:
+      return gdal_resampling = gdal.GRA_Bilinear;
+    case 3:
+      return gdal_resampling = gdal.GRA_Cubic;
+    case 4:
+      return gdal_resampling = gdal.GRA_CubicSpline;
+    case 5:
+      return gdal_resampling = gdal.GRA_Lanczos;
+    case 6:
+      return gdal_resampling = gdal.GRA_Mode;
+    case 7:
+      return gdal_resampling = gdal.GRA_NearestNeighbor;
+    default:
+      return gdal_resampling = gdal.GRA_Cubic;
+  }
+}
+
 
 /**
  * 根据驱动名称（支持任意大小写）获取 GDAL 驱动
@@ -52,33 +95,7 @@ function reprojectImage(src_ds, reproject_path, t_epsg, resampling = 1) {
   t_ds.srs = t_srs;
   t_ds.geoTransform = geoTransform;
   //重采样方法
-  let gdal_resampling;
-  switch (resampling) {
-    case 0:
-      gdal_resampling = gdal.GRA_Average;
-      break;
-    case 1:
-      gdal_resampling = gdal.GRA_Bilinear;
-      break;
-    case 2:
-      gdal_resampling = gdal.GRA_Cubic;
-      break;
-    case 3:
-      gdal_resampling = gdal.GRA_CubicSpline;
-      break;
-    case 4:
-      gdal_resampling = gdal.GRA_Lanczos;
-      break;
-    case 5:
-      gdal_resampling = gdal.GRA_Mode;
-      break;
-    case 6:
-      gdal_resampling = gdal.GRA_NearestNeighbor;
-      break;
-    default:
-      gdal_resampling = gdal.GRA_Average;
-      break;
-  }
+  let gdal_resampling = getResampling(resampling);
   gdal.reprojectImage({ src: s_ds, dst: t_ds, s_srs, t_srs, resampling: gdal_resampling });
   // 关闭退出
   t_ds.close();
@@ -89,5 +106,5 @@ function reprojectImage(src_ds, reproject_path, t_epsg, resampling = 1) {
 
 
 module.exports = {
-  getDriverByName, reprojectImage
+  getDriverByName, reprojectImage, getBuildOverviewResampling
 }

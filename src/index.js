@@ -4,7 +4,7 @@ const path = require('path');
 const process = require('process');
 const os = require('os');
 const { prettyTime, uuid, wait, mkdirsSync, emptyDir } = require('./util');
-const { reprojectImage } = require('./gdal-util');
+const { reprojectImage, getBuildOverviewResampling } = require('./gdal-util');
 const ProgressBar = require('./progressbar/index');
 const { mb_open, mb_stop_writing, mb_put_tile } = require('./mbtiles-util');
 // 创建一个线程池
@@ -105,9 +105,9 @@ function recycle() {
 /**
  * 重投影数据集
  */
-const project = (ds, epsg) => {
+const project = (ds, epsg, resampling) => {
   let projectDatasetPath = path.join(os.tmpdir(), `${uuid()}.tif`);
-  reprojectImage(ds, projectDatasetPath, epsg, 2);
+  reprojectImage(ds, projectDatasetPath, epsg, resampling);
   return projectDatasetPath;
 }
 
@@ -122,6 +122,7 @@ const project = (ds, epsg) => {
 const buildPyramid = (
   ds,
   minZoom,
+  resampling
 ) => {
   const res = ds.geoTransform[1]; // 使用resx替代整个影像的分辨率
   const maxPixel = Math.min(ds.rasterSize.x, ds.rasterSize.y);
@@ -146,7 +147,8 @@ const buildPyramid = (
     overviews.push(factor);
 
   }
-  ds.buildOverviews('CUBIC', overviews);
+  const buildOverviewResampling = getBuildOverviewResampling(resampling);
+  ds.buildOverviews(buildOverviewResampling, overviews);
   // z>=originZ使用原始影像
   return {
     maxOverViewsZ: originZ - 1, // 大于该值用原始影像
@@ -175,7 +177,7 @@ async function main(input, output, options) {
   // 计时开始
   const startTime = global.performance.now();
   // 结构可选参数
-  const { minZoom, maxZoom, epsg, encoding, isClean } = options;
+  const { minZoom, maxZoom, epsg, encoding, isClean, resampling } = options;
   // 固定瓦片尺寸
   const tileSize = 256;
   tileBoundTool = tileBoundMap.get(epsg);
@@ -202,7 +204,7 @@ async function main(input, output, options) {
   //#region 步骤 1 - 重投影
 
   if (sourceDs.srs.getAuthorityCode() !== epsg) {
-    projectPath = project(sourceDs, epsg);
+    projectPath = project(sourceDs, epsg, resampling);
     projectDs = gdal.open(projectPath, 'r');
     sourceDs.close(); // 原始的就不需要了
   } else {
@@ -210,21 +212,12 @@ async function main(input, output, options) {
   }
   sourceDs = null;
   console.log(`>> 步骤${++stepIndex}: 重投影至 EPSG:${epsg} - 完成`);
-  //#region 步骤 2 - 高程值转 RGB，重新编码
-  //encodePath = encodeDataset(projectDs, encoding);
-  //projectDs.close();// 重投影的就不需要了
-  //projectDs = null;
-  //console.log(`>> 步骤${++stepIndex}: 重编码 - 完成`);
-  //#endregion
-
-  //#region 步骤 3 - 建立影像金字塔 由于地形通常是30m 90m精度
-  //encodeDs = gdal.open(encodePath, 'r');
-
-  const overViewInfo = buildPyramid(projectDs, minZoom);
+  //#region 步骤 2 - 建立影像金字塔 由于地形通常是30m 90m精度
+  const overViewInfo = buildPyramid(projectDs, minZoom, resampling);
   console.log(`>> 步骤${++stepIndex}: 构建影像金字塔索引 - 完成`);
   //#endregion
 
-  //#region 步骤4 - 切片
+  //#region 步骤3 - 切片
   const dsInfo = {
     width: projectDs.rasterSize.x,
     height: projectDs.rasterSize.y,
