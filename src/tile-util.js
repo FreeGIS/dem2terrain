@@ -14,15 +14,15 @@ tileBoundMap.set(900913, {
 });
 tileBoundMap.set(4490, {
     xmin: -180,
-    ymin: -180,
+    ymin: -90,
     xmax: 180,
-    ymax: 180
+    ymax: 90
 });
 tileBoundMap.set(4326, {
     xmin: -180,
-    ymin: -180,
+    ymin: -90,
     xmax: 180,
-    ymax: 180
+    ymax: 90
 });
 // 根据xyz计算对应地理坐标系的地理边界
 function ST_TileEnvelope(z, x, y, offset = 0, bbox = tileBoundMap.get(3857)) {
@@ -44,11 +44,13 @@ function ST_TileEnvelope(z, x, y, offset = 0, bbox = tileBoundMap.get(3857)) {
     const tileGeoSizeX = boundsWidth * 1.0 / worldTileSize;
     const tileGeoSizeY = boundsHeight * 1.0 / worldTileSize;
 
-    let x1 = bbox.xmin + tileGeoSizeX * x - tileGeoSizeX / tile_size * offset;
-    let x2 = bbox.xmin + tileGeoSizeX * (x + 1) + tileGeoSizeX / tile_size * offset;
+    const tileGeoSize = Math.max(tileGeoSizeX,tileGeoSizeY);
 
-    let y1 = bbox.ymax - tileGeoSizeY * (y + 1) - tileGeoSizeY / tile_size * offset;
-    let y2 = bbox.ymax - tileGeoSizeY * (y) + tileGeoSizeY / tile_size * offset;
+    let x1 = bbox.xmin + tileGeoSize * x - tileGeoSize / tile_size * offset;
+    let x2 = bbox.xmin + tileGeoSize * (x + 1) + tileGeoSize / tile_size * offset;
+
+    let y1 = bbox.ymax - tileGeoSize * (y + 1) - tileGeoSize / tile_size * offset;
+    let y2 = bbox.ymax - tileGeoSize * (y) + tileGeoSize / tile_size * offset;
 
     return [x1, y1, x2, y2];
 
@@ -59,19 +61,18 @@ function getTileByCoors(coor, zoom, bbox = tileBoundMap.get(3857)) {
     // 计算coor与bbox左上角坐标
     const left = bbox.xmin;
     const top = bbox.ymax;
-
     const _width = coor[0] - left;
     const _height = top - coor[1];
-
     let worldTileSize = 0x01 << zoom;
     const boundsWidth = bbox.xmax - bbox.xmin;
     const boundsHeight = bbox.ymax - bbox.ymin;
-    const tileGeoSizeX = boundsWidth * 1.0 / worldTileSize;
-    const tileGeoSizeY = boundsHeight * 1.0 / worldTileSize;
-
-    const row = Math.floor(_height / tileGeoSizeY);
-    const column = Math.floor(_width / tileGeoSizeX);
-
+    const tileGeoSize = Math.max(boundsWidth,boundsHeight)*1.0/worldTileSize;
+    const row = Math.floor(_height / tileGeoSize);
+    const column = Math.floor(_width / tileGeoSize);
+   
+    if(zoom==9){
+        console.log(zoom,row,column);
+    }
     return {
         row, column
     }

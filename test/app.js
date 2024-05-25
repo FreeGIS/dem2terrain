@@ -1,7 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 
-const demPath = path.join(__dirname, '12m.tif');
+const demPath = path.join(__dirname, 'test.tif');
 const tileDirPath = path.join(__dirname, 'terrain');
 
 const config = {
