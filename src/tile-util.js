@@ -70,9 +70,6 @@ function getTileByCoors(coor, zoom, bbox = tileBoundMap.get(3857)) {
     const row = Math.floor(_height / tileGeoSize);
     const column = Math.floor(_width / tileGeoSize);
    
-    if(zoom==9){
-        console.log(zoom,row,column);
-    }
     return {
         row, column
     }
