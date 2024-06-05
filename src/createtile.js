@@ -4,20 +4,31 @@ const { mapboxEncode, terrariumEncode } = require('./dem-encode');
 const path = require('path');
 const fs = require('fs');
 
-let dataset = null, memDriver = null, pngDriver = null;
+let dataset = null, no_data = null, memDriver = null, pngDriver = null;
 function forEachHeightBuffer(heightBuffer, encode) {
     const channelLength = heightBuffer.length;
     const rBuffer = new Uint8Array(channelLength);
     const gBuffer = new Uint8Array(channelLength);
     const bBuffer = new Uint8Array(channelLength);
-
+    const aBuffer = new Uint8Array(channelLength);
     for (let i = 0; i < channelLength; i++) {
-        const color = encode(heightBuffer[i]);
+        let heightVal = heightBuffer[i];
+        let color, alpha;
+        if (heightVal === no_data) {
+            color = [0, 0, 0];
+            alpha = 0;
+        }
+        else {
+            color = encode(heightVal);
+            alpha = 255;
+        }
+
         rBuffer[i] = color[0];
         gBuffer[i] = color[1];
         bBuffer[i] = color[2];
+        aBuffer[i] = alpha;
     }
-    return [rBuffer, gBuffer, bBuffer];
+    return [rBuffer, gBuffer, bBuffer, aBuffer];
 }
 
 
@@ -48,22 +59,20 @@ function writeTerrainTile(overviewInfo, readinfo, writeinfo, encoding) {
     } else if (encoding === 'terrarium') {
         encodeBuffers = forEachHeightBuffer(heightBuffer, terrariumEncode);
     }
-    [1, 2, 3].forEach(index => {
+    [1, 2, 3, 4].forEach(index => {
         let writeband = writeinfo.ds.bands.get(index);
         writeband.pixels.write(writeinfo.wx, writeinfo.wy, writeinfo.wxsize, writeinfo.wysize, encodeBuffers[index - 1]);
     });
-
-    // 写入mask band
-    let mask_buffer = (new Uint8Array(writeinfo.wxsize * writeinfo.wysize)).fill(255);
-    let mask_band = writeinfo.ds.bands.get(4);
-    mask_band.pixels.write(writeinfo.wx, writeinfo.wy, writeinfo.wxsize, writeinfo.wysize, mask_buffer);
 }
 
 
 function createTile(createInfo, callback) {
     const { outTileSize, overviewInfo, rb, wb, encoding, dsPath, x, y, z, outputTile } = createInfo;
-    if (dataset === null)
+    if (dataset === null) {
         dataset = gdal.open(dsPath, 'r');
+        // 查询no_data数值
+        no_data = dataset.bands.get(1).noDataValue;
+    }
     // 创建一个mem内存，将读取的像素写入mem
     if (memDriver === null)
         memDriver = getDriverByName('mem');

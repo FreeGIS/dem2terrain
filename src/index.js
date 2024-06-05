@@ -207,11 +207,11 @@ async function main(input, output, options) {
     projectPath = project(sourceDs, epsg, resampling);
     projectDs = gdal.open(projectPath, 'r');
     sourceDs.close(); // 原始的就不需要了
+    console.log(`>> 步骤${++stepIndex}: 重投影至 EPSG:${epsg} - 完成`);
   } else {
     projectDs = sourceDs;
   }
   sourceDs = null;
-  console.log(`>> 步骤${++stepIndex}: 重投影至 EPSG:${epsg} - 完成`);
   //#region 步骤 2 - 建立影像金字塔 由于地形通常是30m 90m精度
   const overViewInfo = buildPyramid(projectDs, minZoom, resampling);
   console.log(`>> 步骤${++stepIndex}: 构建影像金字塔索引 - 完成`);

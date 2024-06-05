@@ -98,6 +98,7 @@ function reprojectImage(src_ds, reproject_path, t_epsg, resampling = 1) {
   let gdal_resampling = getResampling(resampling);
   gdal.reprojectImage({ src: s_ds, dst: t_ds, s_srs, t_srs, resampling: gdal_resampling });
   // 关闭退出
+  t_ds.bands.get(1).noDataValue = s_ds.bands.get(1).noDataValue;
   t_ds.close();
   if (typeof (src_ds) === 'string')
     s_ds.close();
