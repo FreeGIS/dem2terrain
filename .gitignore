@@ -110,3 +110,4 @@ dist
 terrain
 config.json
 12m.tif
+no_data.tif
