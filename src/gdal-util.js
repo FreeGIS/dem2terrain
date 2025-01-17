@@ -3,19 +3,19 @@ const gdal = require('gdal-async');
 function getBuildOverviewResampling(resampling) {
   switch (resampling) {
     case 1:
-      return "AVERAGE";
+      return "AVERAGE"; // 加权平均法
     case 2:
-      return "BILINEAR";
+      return "BILINEAR"; // 双线性内插法
     case 3:
-      return "CUBIC";
+      return "CUBIC"; // 三次卷积内插法
     case 4:
-      return "CUBICSPLINE";
+      return "CUBICSPLINE"; // B样条卷积内插法
     case 5:
-      return "LANCZOS";
+      return "LANCZOS"; // Lanczos窗口sinc卷积内插法
     case 6:
-      return "MODE";
+      return "MODE"; // 最常出现值法
     case 7:
-      return "NEAREST";
+      return "NEAREST"; // 最邻近法
     default:
       return "CUBIC";
   }

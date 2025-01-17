@@ -177,7 +177,7 @@ async function main(input, output, options) {
   // 计时开始
   const startTime = global.performance.now();
   // 结构可选参数
-  const { minZoom, maxZoom, epsg, encoding, isClean, resampling } = options;
+  const { minZoom, maxZoom, epsg, encoding, isClean, resampling, baseHeight } = options;
   // 固定瓦片尺寸
   const tileSize = 256;
   tileBoundTool = tileBoundMap.get(epsg);
@@ -190,7 +190,6 @@ async function main(input, output, options) {
     outputDir = path.join(os.tmpdir(), uuid());
 
   let stepIndex = 0;
-  //#region 步骤 1 - 高程值转 RGB，重新编码
   if (isClean === 1) {
     if (isSavaMbtiles === true && fs.existsSync(output))
       fs.unlinkSync(output);
@@ -198,11 +197,8 @@ async function main(input, output, options) {
       emptyDir(output);
     console.log(`>> 步骤${++stepIndex}: 清空输出文件夹 - 完成`);
   }
-
-  //#endregion
   sourceDs = gdal.open(input, 'r');
   //#region 步骤 1 - 重投影
-
   if (sourceDs.srs.getAuthorityCode() !== epsg) {
     projectPath = project(sourceDs, epsg, resampling);
     projectDs = gdal.open(projectPath, 'r');
@@ -212,6 +208,7 @@ async function main(input, output, options) {
     projectDs = sourceDs;
   }
   sourceDs = null;
+  //#endregion
   //#region 步骤 2 - 建立影像金字塔 由于地形通常是30m 90m精度
   const overViewInfo = buildPyramid(projectDs, minZoom, resampling);
   console.log(`>> 步骤${++stepIndex}: 构建影像金字塔索引 - 完成`);
@@ -308,7 +305,8 @@ async function main(input, output, options) {
           x: j,
           y: i,
           z: tz,
-          outputTile: outputDir
+          outputTile: outputDir,
+          baseHeight
         };
         pileUpCount++;
         if (pileUpCount > 500)

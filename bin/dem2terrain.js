@@ -5,7 +5,7 @@ const path = require('path');
 const version = require('../package.json').version;
 
 // node版本检查
-if(+process.version.substring(1,3)<16){
+if (+process.version.substring(1, 3) < 16) {
   console.error(`node版本>=16，当前版本 ${process.version}`);
   process.exit();
 }
@@ -27,7 +27,8 @@ program
   .option('-g, --epsg <number>', '<可选> Tile适用坐标系，3857 | 4490 | 4326', 3857)
   .option('-c, --clean <number>', '<可选> 是否清空输出目录，0 | 1', 0)
   .option('-z, --zoom <number-number>', '<可选> 指定瓦片的等级生成范围。例如，想生成 7 ~ 12 级的瓦片，则输入 -z 7-12', '5-14')
-  .option('-e, --encoding <string>', '<可选> 指定瓦片的数据编码规则（mapbox 或 terrarium）', 'mapbox');
+  .option('-e, --encoding <string>', '<可选> 指定瓦片的数据编码规则（mapbox 或 terrarium）', 'mapbox')
+  .option('-b, --baseHeight <number>', '<可选> 基准高度，默认0', 0);
 
 // --- 解析参数
 program.parse();
@@ -35,13 +36,13 @@ program.parse();
 const options = program.opts();
 // 判别是否是配置文件还是命令行配置
 let params;
-if (options['configFile']) 
+if (options['configFile'])
   params = require(options['configFile']);
-else 
+else
   params = options;
 const inputDem = params['input'];
 const outputDir = params['output'];
-if(inputDem===undefined||outputDir===undefined){
+if (inputDem === undefined || outputDir === undefined) {
   console.log('参数缺失: 输入文件路径或输出目录必填');
   process.exit();
 }
@@ -49,6 +50,9 @@ if(inputDem===undefined||outputDir===undefined){
 const encoding = params['encoding'];
 const epsg = Number(params['epsg']);
 const isClean = Number(params['clean']);
+let baseHeight = Number(params['baseHeight']);
+if (isNaN(baseHeight))
+  baseHeight = 0;
 let zoom = params['zoom'];
 zoom = zoom.split('-');
 const minZoom = Number(zoom[0]);
@@ -73,6 +77,7 @@ const logMsg = `\n>> 开始转换...
 - 瓦片编码: ${encoding === 'mapbox' ? 'mapbox(raster-dem)' : encoding}
 - 瓦片尺寸: 256 px
 - 瓦片等级: ${minZoom} 至 ${maxZoom} 级
+- 基准高度: ${baseHeight}
 `;
 console.log(logMsg);
 
@@ -81,5 +86,6 @@ main(inputDem, outputDir, {
   maxZoom,
   epsg,
   encoding,
-  isClean
+  isClean,
+  baseHeight
 });

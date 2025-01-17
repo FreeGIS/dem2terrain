@@ -4,7 +4,7 @@ const { mapboxEncode, terrariumEncode } = require('./dem-encode');
 const path = require('path');
 const fs = require('fs');
 
-let dataset = null, no_data = null, memDriver = null, pngDriver = null;
+let dataset = null, no_data = null, _baseHeight = 0, memDriver = null, pngDriver = null;
 function forEachHeightBuffer(heightBuffer, encode) {
     const channelLength = heightBuffer.length;
     const rBuffer = new Uint8Array(channelLength);
@@ -13,20 +13,15 @@ function forEachHeightBuffer(heightBuffer, encode) {
     const aBuffer = new Uint8Array(channelLength);
     for (let i = 0; i < channelLength; i++) {
         let heightVal = heightBuffer[i];
-        let color, alpha;
-        if (heightVal === no_data) {
-            color = [0, 0, 0];
-            alpha = 0;
-        }
-        else {
-            color = encode(heightVal);
-            alpha = 255;
-        }
-
+        let color;
+        if (heightVal === no_data)
+            color = [1, 134, 160]; // 编码后凑海拔=0，修复地形塌陷产生空白
+        else
+            color = encode(heightVal - _baseHeight);
         rBuffer[i] = color[0];
         gBuffer[i] = color[1];
         bBuffer[i] = color[2];
-        aBuffer[i] = alpha;
+        aBuffer[i] = 255;
     }
     return [rBuffer, gBuffer, bBuffer, aBuffer];
 }
@@ -67,11 +62,12 @@ function writeTerrainTile(overviewInfo, readinfo, writeinfo, encoding) {
 
 
 function createTile(createInfo, callback) {
-    const { outTileSize, overviewInfo, rb, wb, encoding, dsPath, x, y, z, outputTile } = createInfo;
+    const { outTileSize, overviewInfo, rb, wb, encoding, dsPath, x, y, z, outputTile, baseHeight } = createInfo;
     if (dataset === null) {
         dataset = gdal.open(dsPath, 'r');
         // 查询no_data数值
         no_data = dataset.bands.get(1).noDataValue;
+        _baseHeight = baseHeight;
     }
     // 创建一个mem内存，将读取的像素写入mem
     if (memDriver === null)
