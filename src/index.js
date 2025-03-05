@@ -177,7 +177,7 @@ async function main(input, output, options) {
   // 计时开始
   const startTime = global.performance.now();
   // 结构可选参数
-  const { minZoom, maxZoom, epsg, encoding, isClean, resampling, baseHeight } = options;
+  const { minZoom, maxZoom, epsg, encoding, isClean, resampling } = options;
   // 固定瓦片尺寸
   const tileSize = 256;
   tileBoundTool = tileBoundMap.get(epsg);
@@ -305,8 +305,7 @@ async function main(input, output, options) {
           x: j,
           y: i,
           z: tz,
-          outputTile: outputDir,
-          baseHeight
+          outputTile: outputDir
         };
         pileUpCount++;
         if (pileUpCount > 500)

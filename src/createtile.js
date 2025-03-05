@@ -4,7 +4,9 @@ const { mapboxEncode, terrariumEncode } = require('./dem-encode');
 const path = require('path');
 const fs = require('fs');
 
-let dataset = null, no_data = null, _baseHeight = 0, memDriver = null, pngDriver = null;
+let dataset = null, noData = null, memDriver = null, pngDriver = null;
+const invalidColor = [1, 134, 160];// 编码后凑海拔=0，修复地形塌陷产生空白
+let outTileSize1;
 function forEachHeightBuffer(heightBuffer, encode) {
     const channelLength = heightBuffer.length;
     const rBuffer = new Uint8Array(channelLength);
@@ -14,10 +16,10 @@ function forEachHeightBuffer(heightBuffer, encode) {
     for (let i = 0; i < channelLength; i++) {
         let heightVal = heightBuffer[i];
         let color;
-        if (heightVal === no_data)
-            color = [1, 134, 160]; // 编码后凑海拔=0，修复地形塌陷产生空白
+        if (heightVal === noData)
+            color = invalidColor; // 编码后凑海拔=0，修复地形塌陷产生空白
         else
-            color = encode(heightVal - _baseHeight);
+            color = encode(heightVal);
         rBuffer[i] = color[0];
         gBuffer[i] = color[1];
         bBuffer[i] = color[2];
@@ -54,20 +56,36 @@ function writeTerrainTile(overviewInfo, readinfo, writeinfo, encoding) {
     } else if (encoding === 'terrarium') {
         encodeBuffers = forEachHeightBuffer(heightBuffer, terrariumEncode);
     }
+
+    let _length = outTileSize1 * outTileSize1;
+    let r = new Uint8Array(_length);
+    let g = new Uint8Array(_length);
+    let b = new Uint8Array(_length);
+    let a = new Uint8Array(_length);
+    for (let i = 0; i < _length; i++) {
+        r[i] = invalidColor[0];
+        g[i] = invalidColor[1];
+        b[i] = invalidColor[2];
+        a[i] = 255;
+    };
+    let defaultBuffers = [r, g, b, a];
     [1, 2, 3, 4].forEach(index => {
         let writeband = writeinfo.ds.bands.get(index);
+        // 先填充默认值
+        writeband.pixels.write(0, 0, outTileSize1, outTileSize1, defaultBuffers[index - 1]);
+        // 填充实际值
         writeband.pixels.write(writeinfo.wx, writeinfo.wy, writeinfo.wxsize, writeinfo.wysize, encodeBuffers[index - 1]);
     });
 }
 
 
 function createTile(createInfo, callback) {
-    const { outTileSize, overviewInfo, rb, wb, encoding, dsPath, x, y, z, outputTile, baseHeight } = createInfo;
+    const { outTileSize, overviewInfo, rb, wb, encoding, dsPath, x, y, z, outputTile } = createInfo;
+    outTileSize1 = outTileSize;
     if (dataset === null) {
         dataset = gdal.open(dsPath, 'r');
         // 查询no_data数值
-        no_data = dataset.bands.get(1).noDataValue;
-        _baseHeight = baseHeight;
+        noData = dataset.bands.get(1).noDataValue;
     }
     // 创建一个mem内存，将读取的像素写入mem
     if (memDriver === null)

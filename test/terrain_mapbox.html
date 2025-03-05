@@ -31,15 +31,14 @@
     const map = new mapboxgl.Map({
       container: 'map',
       zoom: 8,
-      center: [105.62, 34.13],
+      center: [103.98464635299729, 30.69244825172305],
       pitch: 76,
-      bearing: 150,
       // Choose from Mapbox's core styles, or make your own style with Mapbox Studio
       style: 'mapbox://styles/mapbox/satellite-streets-v12',
       hash: false
     });
 
-    map.on('load', (e)=>{
+    map.on('load', (e) => {
       // Set custom fog
       map.setFog({
         'range': [-0.5, 2],
@@ -53,9 +52,13 @@
         'type': 'raster-dem',
         'tiles': ['./terrain/{z}/{x}/{y}.png'],
         tileSize: 256,
-        'maxzoom': 14
+        'maxzoom': 14,
+        'minzoom': 5
       });
       map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
+    });
+    map.on('click', function (e) {
+      console.log(e);
     })
 
 
