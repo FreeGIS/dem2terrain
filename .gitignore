@@ -109,5 +109,4 @@ dist
 .tern-port
 terrain
 config.json
-12m.tif
-no_data.tif
+dem.tif
