@@ -37,8 +37,14 @@ function writeTerrainTile(overviewInfo, readinfo, writeinfo, encoding) {
         readband = readinfo.ds.bands.get(1).overviews.get(overviewInfo.index);
     //let writeband = writeinfo.ds.bands.get(i);
     let dataType = readband.dataType;
+    // console.log('aaaa', readband, dataType, gdal.GDT_Byte);
     let heightBuffer;
-    if (dataType === gdal.GDT_Int16)
+    // 特殊异常处理
+    if (dataType === 'Int8' || dataType == gdal.GDT_Byte) {
+        heightBuffer = new Uint8Array(writeinfo.wxsize * writeinfo.wysize);
+        dataType = gdal.GDT_Byte;
+    }
+    else if (dataType === gdal.GDT_Int16)
         heightBuffer = new Int16Array(writeinfo.wxsize * writeinfo.wysize);
     else if (dataType === gdal.GDT_Float32)
         heightBuffer = new Float32Array(writeinfo.wxsize * writeinfo.wysize);
