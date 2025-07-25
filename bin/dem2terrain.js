@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const program = require('commander');
+const { program } = require('commander');
 const main = require('../index');
 const path = require('path');
 const version = require('../package.json').version;

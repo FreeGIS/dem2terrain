@@ -35,19 +35,19 @@ function writeTerrainTile(overviewInfo, readinfo, writeinfo, encoding) {
         readband = readinfo.ds.bands.get(1);
     else // 从影像金字塔里读取band信息
         readband = readinfo.ds.bands.get(1).overviews.get(overviewInfo.index);
-    //let writeband = writeinfo.ds.bands.get(i);
     let dataType = readband.dataType;
-    // console.log('aaaa', readband, dataType, gdal.GDT_Byte);
     let heightBuffer;
     // 特殊异常处理
-    if (dataType === 'Int8' || dataType == gdal.GDT_Byte) {
+    if  (dataType == gdal.GDT_Byte) 
         heightBuffer = new Uint8Array(writeinfo.wxsize * writeinfo.wysize);
-        dataType = gdal.GDT_Byte;
-    }
     else if (dataType === gdal.GDT_Int16)
         heightBuffer = new Int16Array(writeinfo.wxsize * writeinfo.wysize);
     else if (dataType === gdal.GDT_Float32)
         heightBuffer = new Float32Array(writeinfo.wxsize * writeinfo.wysize);
+    else if (dataType === 'Int8') {
+        heightBuffer = new Int16Array(writeinfo.wxsize * writeinfo.wysize);
+        dataType = gdal.Int16Array;
+    }
 
     readband.pixels.read(readinfo.rx, readinfo.ry, readinfo.rxsize, readinfo.rysize, heightBuffer, {
         buffer_width: writeinfo.wxsize,
